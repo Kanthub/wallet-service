@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/roothash-pay/wallet-services/database"
-	multimarket_grpc "github.com/roothash-pay/wallet-services/proto/multimarket"
+	"github.com/roothash-pay/wallet-services/proto/wallet"
 )
 
 const MaxRecvMessageSize = 1024 * 1024 * 30000
@@ -24,7 +24,7 @@ type PhoenixRpcConfig struct {
 type PhoenixRpcService struct {
 	*PhoenixRpcConfig
 	db *database.DB
-	multimarket_grpc.UnimplementedPhoenixServicesServer
+	wallet.UnimplementedPhoenixServicesServer
 	stopped atomic.Bool
 }
 
@@ -53,7 +53,7 @@ func (prs *PhoenixRpcService) Start(ctx context.Context) error {
 		)
 
 		reflection.Register(gs)
-		multimarket_grpc.RegisterPhoenixServicesServer(gs, prs)
+		wallet.RegisterPhoenixServicesServer(gs, prs)
 
 		log.Info("grpc info", "addr", listener.Addr())
 

@@ -11,7 +11,6 @@ import (
 
 type Config struct {
 	Migrations                string       `yaml:"migrations"`
-	RPCs                      []*RPC       `yaml:"rpcs"`
 	MasterDB                  DBConfig     `yaml:"master_db"`
 	SlaveDB                   DBConfig     `yaml:"slave_db"`
 	SlaveDbEnable             bool         `yaml:"slave_db_enable"`
@@ -35,15 +34,9 @@ type Config struct {
 	CallerAddress             string       `yaml:"caller_address"`
 }
 
-type ChainScannerConfig struct {
+type WalletChainConfig struct {
 	RpcUrl        string `yaml:"rpc_url"`
 	ConsumerToken string `yaml:"consumer_token"`
-}
-
-type WalletSignConfig struct {
-	RpcUrl        string `yaml:"rpc_url"`
-	ConsumerToken string `yaml:"consumer_token"`
-	ChainName     string `yaml:"chain_name"`
 }
 
 type DBConfig struct {
@@ -111,16 +104,6 @@ type S3Config struct {
 	Endpoint     string `yaml:"endpoint"`
 	CDNDomain    string `yaml:"cdn_domain"`
 	UsePathStyle bool   `yaml:"use_path_style"`
-}
-
-type RPC struct {
-	RpcUrl    string   `yaml:"rpc_url"`
-	ChainId   uint64   `yaml:"chain_id"`
-	Contracts Contract `yaml:"contracts"`
-}
-
-type Contract struct {
-	ReferralRewardManager string `yaml:"referral_reward_manager"`
 }
 
 func New(path string) (*Config, error) {

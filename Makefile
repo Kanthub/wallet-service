@@ -1,10 +1,8 @@
-RRM_ABI_ARTIFACT := ./abis/ReferralRewardManager.sol/ReferralRewardManager.json
-
-event-services:
-	env GO111MODULE=on go build -v $(LDFLAGS) ./cmd/event-services
+wallet-services:
+	env GO111MODULE=on go build -v $(LDFLAGS) ./cmd/wallet-services
 
 clean:
-	rm event-services
+	rm wallet-services
 
 test:
 	go test -v ./...
@@ -12,28 +10,8 @@ test:
 lint:
 	golangci-lint run ./...
 
-bindings: binding-rrm
-
-binding-rrm:
-	$(eval temp := $(shell mktemp))
-
-	cat $(RRM_ABI_ARTIFACT) \
-		| jq -r .bytecode.object > $(temp)
-
-	cat $(RRM_ABI_ARTIFACT) \
-		| jq .abi \
-		| abigen --pkg bindings \
-		--abi - \
-		--out bindings/rrm_manager.go \
-		--type ReferralRewardManager \
-		--bin $(temp)
-
-		rm $(temp)
-
 .PHONY: \
-	event-services \
-	bindings \
-	binding-rrm \
+	wallet-services \
 	clean \
 	test \
 	lint

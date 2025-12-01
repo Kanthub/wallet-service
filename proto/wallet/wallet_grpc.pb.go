@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v4.25.3
-// source: proto/phnxsvc.proto
+// source: proto/wallet_grpc.proto
 
-package multimarket
+package wallet
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -31,7 +31,7 @@ type QueryFeeRequest struct {
 
 func (x *QueryFeeRequest) Reset() {
 	*x = QueryFeeRequest{}
-	mi := &file_proto_phnxsvc_proto_msgTypes[0]
+	mi := &file_proto_wallet_grpc_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *QueryFeeRequest) String() string {
 func (*QueryFeeRequest) ProtoMessage() {}
 
 func (x *QueryFeeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_phnxsvc_proto_msgTypes[0]
+	mi := &file_proto_wallet_grpc_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *QueryFeeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryFeeRequest.ProtoReflect.Descriptor instead.
 func (*QueryFeeRequest) Descriptor() ([]byte, []int) {
-	return file_proto_phnxsvc_proto_rawDescGZIP(), []int{0}
+	return file_proto_wallet_grpc_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *QueryFeeRequest) GetConsumerToken() string {
@@ -83,7 +83,7 @@ type QueryFeeResponse struct {
 
 func (x *QueryFeeResponse) Reset() {
 	*x = QueryFeeResponse{}
-	mi := &file_proto_phnxsvc_proto_msgTypes[1]
+	mi := &file_proto_wallet_grpc_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -95,7 +95,7 @@ func (x *QueryFeeResponse) String() string {
 func (*QueryFeeResponse) ProtoMessage() {}
 
 func (x *QueryFeeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_phnxsvc_proto_msgTypes[1]
+	mi := &file_proto_wallet_grpc_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -108,7 +108,7 @@ func (x *QueryFeeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryFeeResponse.ProtoReflect.Descriptor instead.
 func (*QueryFeeResponse) Descriptor() ([]byte, []int) {
-	return file_proto_phnxsvc_proto_rawDescGZIP(), []int{1}
+	return file_proto_wallet_grpc_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *QueryFeeResponse) GetReturnCode() uint64 {
@@ -125,42 +125,42 @@ func (x *QueryFeeResponse) GetMessage() string {
 	return ""
 }
 
-var File_proto_phnxsvc_proto protoreflect.FileDescriptor
+var File_proto_wallet_grpc_proto protoreflect.FileDescriptor
 
-const file_proto_phnxsvc_proto_rawDesc = "" +
+const file_proto_wallet_grpc_proto_rawDesc = "" +
 	"\n" +
-	"\x13proto/phnxsvc.proto\x12\x14multimarket.protocol\"S\n" +
+	"\x17proto/wallet_grpc.proto\x12\x0fwallet.protocol\"S\n" +
 	"\x0fQueryFeeRequest\x12%\n" +
 	"\x0econsumer_token\x18\x01 \x01(\tR\rconsumerToken\x12\x19\n" +
 	"\bchain_id\x18\x02 \x01(\x04R\achainId\"M\n" +
 	"\x10QueryFeeResponse\x12\x1f\n" +
 	"\vreturn_code\x18\x01 \x01(\x04R\n" +
 	"returnCode\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2w\n" +
-	"\x0fPhoenixServices\x12d\n" +
-	"\x11queryFeeByChainId\x12%.multimarket.protocol.QueryFeeRequest\x1a&.multimarket.protocol.QueryFeeResponse\"\x00B/\n" +
-	"\x18com.multimarket.protocolZ\x13./proto/multimarketb\x06proto3"
+	"\amessage\x18\x02 \x01(\tR\amessage2m\n" +
+	"\x0fPhoenixServices\x12Z\n" +
+	"\x11queryFeeByChainId\x12 .wallet.protocol.QueryFeeRequest\x1a!.wallet.protocol.QueryFeeResponse\"\x00B%\n" +
+	"\x13com.wallet.protocolZ\x0e./proto/walletb\x06proto3"
 
 var (
-	file_proto_phnxsvc_proto_rawDescOnce sync.Once
-	file_proto_phnxsvc_proto_rawDescData []byte
+	file_proto_wallet_grpc_proto_rawDescOnce sync.Once
+	file_proto_wallet_grpc_proto_rawDescData []byte
 )
 
-func file_proto_phnxsvc_proto_rawDescGZIP() []byte {
-	file_proto_phnxsvc_proto_rawDescOnce.Do(func() {
-		file_proto_phnxsvc_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_phnxsvc_proto_rawDesc), len(file_proto_phnxsvc_proto_rawDesc)))
+func file_proto_wallet_grpc_proto_rawDescGZIP() []byte {
+	file_proto_wallet_grpc_proto_rawDescOnce.Do(func() {
+		file_proto_wallet_grpc_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_wallet_grpc_proto_rawDesc), len(file_proto_wallet_grpc_proto_rawDesc)))
 	})
-	return file_proto_phnxsvc_proto_rawDescData
+	return file_proto_wallet_grpc_proto_rawDescData
 }
 
-var file_proto_phnxsvc_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_proto_phnxsvc_proto_goTypes = []any{
-	(*QueryFeeRequest)(nil),  // 0: multimarket.protocol.QueryFeeRequest
-	(*QueryFeeResponse)(nil), // 1: multimarket.protocol.QueryFeeResponse
+var file_proto_wallet_grpc_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_proto_wallet_grpc_proto_goTypes = []any{
+	(*QueryFeeRequest)(nil),  // 0: wallet.protocol.QueryFeeRequest
+	(*QueryFeeResponse)(nil), // 1: wallet.protocol.QueryFeeResponse
 }
-var file_proto_phnxsvc_proto_depIdxs = []int32{
-	0, // 0: multimarket.protocol.PhoenixServices.queryFeeByChainId:input_type -> multimarket.protocol.QueryFeeRequest
-	1, // 1: multimarket.protocol.PhoenixServices.queryFeeByChainId:output_type -> multimarket.protocol.QueryFeeResponse
+var file_proto_wallet_grpc_proto_depIdxs = []int32{
+	0, // 0: wallet.protocol.PhoenixServices.queryFeeByChainId:input_type -> wallet.protocol.QueryFeeRequest
+	1, // 1: wallet.protocol.PhoenixServices.queryFeeByChainId:output_type -> wallet.protocol.QueryFeeResponse
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -168,26 +168,26 @@ var file_proto_phnxsvc_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_proto_phnxsvc_proto_init() }
-func file_proto_phnxsvc_proto_init() {
-	if File_proto_phnxsvc_proto != nil {
+func init() { file_proto_wallet_grpc_proto_init() }
+func file_proto_wallet_grpc_proto_init() {
+	if File_proto_wallet_grpc_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_phnxsvc_proto_rawDesc), len(file_proto_phnxsvc_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_wallet_grpc_proto_rawDesc), len(file_proto_wallet_grpc_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_phnxsvc_proto_goTypes,
-		DependencyIndexes: file_proto_phnxsvc_proto_depIdxs,
-		MessageInfos:      file_proto_phnxsvc_proto_msgTypes,
+		GoTypes:           file_proto_wallet_grpc_proto_goTypes,
+		DependencyIndexes: file_proto_wallet_grpc_proto_depIdxs,
+		MessageInfos:      file_proto_wallet_grpc_proto_msgTypes,
 	}.Build()
-	File_proto_phnxsvc_proto = out.File
-	file_proto_phnxsvc_proto_goTypes = nil
-	file_proto_phnxsvc_proto_depIdxs = nil
+	File_proto_wallet_grpc_proto = out.File
+	file_proto_wallet_grpc_proto_goTypes = nil
+	file_proto_wallet_grpc_proto_depIdxs = nil
 }

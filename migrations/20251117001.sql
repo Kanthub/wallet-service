@@ -69,15 +69,15 @@ CREATE INDEX idx_role_role_name ON role (role_name);
 
 
 create table if not exists role_auth (
-    auth_id INT NOT NULL,
-    role_id BIGINT NOT NULL,
+    auth_id  INT NOT NULL,
+    role_id  BIGINT NOT NULL,
     PRIMARY KEY (auth_id, role_id)
 );
 CREATE INDEX idx_role_auth_role_id ON role_auth (role_id);
 
 
 create table if not exists admin (
-    guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
+    guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     login_name    VARCHAR(32)  NOT NULL UNIQUE,   -- 登录名 --
     real_name     VARCHAR(32)  UNIQUE,            -- 真实姓名 --
     password      VARCHAR(100) NOT NULL,          -- 密码(加密后) --
@@ -85,13 +85,13 @@ create table if not exists admin (
     phone         VARCHAR(11) UNIQUE,             -- 手机号 --
     email         VARCHAR(32),                    -- 邮箱 --
     salt          VARCHAR(255) DEFAULT '',        -- 密码盐 --
-    last_login    BIGINT DEFAULT 0,               -- 最后登录时间戳 --
+    last_login    INTEGER DEFAULT 0,              -- 最后登录时间戳 --
     last_ip       VARCHAR(255) DEFAULT '',        -- 最后登录 IP --
     status        INT DEFAULT 1,                  -- 状态(1启用;0禁用) --
     create_id     INT DEFAULT 0,                  -- 创建人 --
     update_id     INT DEFAULT 0,                  -- 修改人 --
-    created      INTEGER CHECK (created > 0),
-    updated      INTEGER CHECK (updated > 0)
+    created       INTEGER CHECK (created > 0),
+    updated       INTEGER CHECK (updated > 0)
 );
 CREATE INDEX idx_admin_status ON admin (status);
 CREATE INDEX idx_admin_create_id ON admin (create_id);
@@ -104,102 +104,145 @@ CREATE TABLE if not exists chain (
     chain_mark         VARCHAR(70) NOT NULL,
     chain_logo         VARCHAR(200) NOT NULL,
     chain_active_logo  VARCHAR(200) NOT NULL,
-    chain_model_type   VARCHAR(10) NOT NULL,
+    chain_model_type   VARCHAR(10) NOT NULL,  --utxo/account--
     created            INTEGER CHECK (created > 0),
     updated            INTEGER CHECK (updated > 0)
 );
 
-CREATE TABLE if not exists asset (
-    guid                 TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    asset_name           VARCHAR(70) NOT NULL,
-    asset_mark           VARCHAR(70) NOT NULL,
-    asset_logo           VARCHAR(100),
-    asset_active_logo    VARCHAR(100),
-    asset_unit           VARCHAR(10) NOT NULL,
-    asset_symbol         VARCHAR(70) NOT NULL,
-    asset_contract_addr  VARCHAR(70) NOT NULL,
-    asset_chain_uuid     VARCHAR(255) DEFAULT '',
-    is_hot               VARCHAR(32) NOT NULL,
-    created              INTEGER CHECK (created > 0),
-    updated              INTEGER CHECK (updated > 0)
+CREATE TABLE if not exists token (
+    guid                    TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
+    token_name              VARCHAR(70) DEFAULT '',
+    token_mark              VARCHAR(70) DEFAULT '',
+    token_logo              VARCHAR(100) DEFAULT '',
+    token_active_logo       VARCHAR(100) DEFAULT '',
+    token_decimal           VARCHAR(10) DEFAULT '18',
+    token_symbol            VARCHAR(70) DEFAULT '',
+    token_contract_address  VARCHAR(70) NOT NULL,
+    token_chain_uuid        VARCHAR(255) DEFAULT '',
+    is_hot                  VARCHAR(32) NOT NULL DEFAULT 'hot',
+    created                 INTEGER CHECK (created > 0),
+    updated                 INTEGER CHECK (updated > 0)
 );
 
 CREATE TABLE if not exists wallet (
-    guid        TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    device_id   VARCHAR(70) NOT NULL,
-    wallet_uuid VARCHAR(70) NOT NULL,
-    wallet_name VARCHAR(70) NOT NULL,
-    asset_usd   INTEGER CHECK (asset_usd > 0),
-    asset_cny   INTEGER CHECK (asset_usd > 0),
-    chain_uuid  VARCHAR(255) DEFAULT '',
-    created     INTEGER CHECK (created > 0),
-    updated     INTEGER CHECK (updated > 0)
+    guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
+    device_uuid   VARCHAR(255) NOT NULL,
+    wallet_uuid   VARCHAR(255) NOT NULL,
+    chain_uuid    VARCHAR(255) DEFAULT '',
+    wallet_name   VARCHAR(70) DEFAULT 'roothash',
+    asset_usdt    INTEGER CHECK (asset_usdt > 0),
+    asset_usd     INTEGER CHECK (asset_usd > 0),
+    created       INTEGER CHECK (created > 0),
+    updated       INTEGER CHECK (updated > 0)
 );
 
 CREATE TABLE if not exists wallet_address (
     guid             TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    address_index    VARCHAR(10) NOT NULL,
+    address_index    INTEGER CHECK (address_index > 0),
     address          VARCHAR(70) NOT NULL,
-    wallet_id        VARCHAR(255) DEFAULT ''
+    wallet_uuid      VARCHAR(255) DEFAULT ''
     created          INTEGER CHECK (created > 0),
     updated          INTEGER CHECK (updated > 0)
 );
 
 CREATE TABLE if not exists wallet_asset (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    contract_addr VARCHAR(70) NOT NULL,
-    asset_usd     INTEGER CHECK (asset_usd > 0),
-    asset_cny     INTEGER CHECK (asset_cny > 0),
-    balance       NUMERIC(65,30) NOT NULL,
     asset_uuid    VARCHAR(255) DEFAULT '',
     chain_uuid    VARCHAR(255) DEFAULT '',
+    balance       INTEGER CHECK (balance > 0),
+    asset_usdt    INTEGER CHECK (asset_usdt > 0),
+    asset_usd     INTEGER CHECK (asset_usd > 0),
     created       INTEGER CHECK (created > 0),
     updated       INTEGER CHECK (updated > 0)
 );
 
-CREATE TABLE if not exists address_amount_stat (
+CREATE TABLE if not exists asset_amount_stat (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    amount        NUMERIC(65,30) NOT NULL,
-    timedate      VARCHAR(70) NOT NULL,
     asset_uuid    VARCHAR(255) DEFAULT '',
+    time_date     VARCHAR(255) NOT NULL,
+    amount        INTEGER CHECK (amount > 0),
     created       INTEGER CHECK (created > 0),
     updated       INTEGER CHECK (updated > 0)
 );
 
 CREATE TABLE if not exists address_asset (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    asset_usd     INTEGER CHECK (asset_usd > 0),
-    asset_cny     INTEGER CHECK (asset_cny > 0),
-    balance       INTEGER CHECK (balance > 0),
-    address_uuid  VARCHAR(255) DEFAULT '',
     asset_uuid    VARCHAR(255) DEFAULT '',
     wallet_uuid   VARCHAR(255) DEFAULT '',
+    address_uuid  VARCHAR(255) DEFAULT '',
+    asset_usdt    INTEGER CHECK (asset_usdt > 0),
+    asset_usd     INTEGER CHECK (asset_usd > 0),
+    balance       INTEGER CHECK (balance > 0),
     created       INTEGER CHECK (created > 0),
     updated       INTEGER CHECK (updated > 0)
 );
 
 CREATE TABLE if not exists wallet_tx_record (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    from_addr     VARCHAR(70) NOT NULL,
-    to_addr       VARCHAR(70) NOT NULL,
-    amount        NUMERIC(65,30) NOT NULL,
-    memo          VARCHAR(70) NOT NULL,
-    hash          VARCHAR(70) NOT NULL,
-    block_height  VARCHAR(70) NOT NULL,
-    tx_time       VARCHAR(70) NOT NULL,
-    asset_uuid    VARCHAR(255) DEFAULT '',
+    tx_time       VARCHAR(500) NOT NULL,
     chain_uuid    VARCHAR(255) DEFAULT '',
+    asset_uuid    VARCHAR(255) DEFAULT '',
+    from_address  VARCHAR(70) NOT NULL,
+    to_address    VARCHAR(70) NOT NULL,
+    amount        INTEGER CHECK (amount > 0),
+    memo          VARCHAR(500) NOT NULL,
+    hash          VARCHAR(500) NOT NULL,
+    block_height  VARCHAR(500) NOT NULL,
+    explorer_url  VARCHAR(500) NOT NULL,
     created       INTEGER CHECK (created > 0),
     updated       INTEGER CHECK (updated > 0)
 );
 
 CREATE TABLE if not exists wallet_address_note (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    device_id    VARCHAR(255) NOT NULL,
+    device_uuid  VARCHAR(255) NOT NULL,
+    chain_uuid   VARCHAR(255) DEFAULT '',
     memo         VARCHAR(255) NOT NULL,
     address      VARCHAR(255) NOT NULL,
-    asset_uuid   VARCHAR(255) DEFAULT '',
-    chain_uuid   VARCHAR(255) DEFAULT '',
     created      INTEGER CHECK (created > 0),
     updated      INTEGER CHECK (updated > 0)
 );
+
+CREATE TABLE if not exists fiat_currency_rate (
+    guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
+    key_name     VARCHAR(255) NOT NULL,
+    value_data   VARCHAR(255) NOT NULL,
+    created      INTEGER CHECK (created > 0),
+    updated      INTEGER CHECK (updated > 0)
+)
+
+CREATE TABLE if not exists market_price (
+    guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
+    chain_uuid   VARCHAR(255) DEFAULT '',
+    asset_uuid   VARCHAR(255) DEFAULT '',
+    usdt_price   INTEGER CHECK (usdt_price > 0),
+    usd_price    INTEGER CHECK (usd_price > 0),
+    market_cap   INTEGER CHECK (market_cap > 0),
+    liquidity    INTEGER CHECK (liquidity > 0),
+    24h_volume   INTEGER CHECK (liquidity > 0),
+    price_change VARCHAR(255) NOT NULL,
+    ranking      VARCHAR(255) NOT NULL,
+    created      INTEGER CHECK (created > 0),
+    updated      INTEGER CHECK (updated > 0)
+)
+
+CREATE TABLE IF NOT EXISTS kline (
+    guid          VARCHAR PRIMARY KEY,
+    token_id      VARCHAR NOT NULL,
+    time_interval VARCHAR NOT NULL,          -- K线周期，如 1m, 5m, 1h, 1d --
+    open_time     TIMESTAMP NOT NULL,        -- 开始时间 --
+    open_price    NUMERIC(20, 8) NOT NULL,   -- 开盘价 --
+    high_price    NUMERIC(20, 8) NOT NULL,   -- 最高价 --
+    low_price     NUMERIC(20, 8) NOT NULL,   -- 最低价 --
+    close_price   NUMERIC(20, 8) NOT NULL,   -- 收盘价 --
+    volume        UINT256 NOT NULL,          -- 成交量（币数量） --
+    quote_volume  UINT256 DEFAULT 0,         -- 成交额（计价货币） --
+    trade_count   UINT256 DEFAULT 0,         -- 成交笔数 --
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kline_interval_time ON kline(token_id, time_interval, open_time);
+CREATE INDEX IF NOT EXISTS idx_kline_time ON kline(symbol_id, open_time DESC);
+
+
+

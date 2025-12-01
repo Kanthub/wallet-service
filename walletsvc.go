@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"net"
 	"net/http"
 	"strconv"
@@ -14,33 +13,28 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/roothash-pay/wallet-services/common/httputil"
 	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	"github.com/roothash-pay/wallet-services/metrics"
-	"github.com/roothash-pay/wallet-services/relayer"
-	"github.com/roothash-pay/wallet-services/relayer/driver"
 	"github.com/roothash-pay/wallet-services/services/websocket"
-	"github.com/roothash-pay/wallet-services/worker"
+	"github.com/roothash-pay/wallet-services/worker/market_task"
 )
 
 type WalletServices struct {
-	DB               *database.DB
-	metricsServer    *httputil.HTTPServer
-	metricsRegistry  *prometheus.Registry
-	phoenixMetrics   *metrics.PhoenixMetrics
-	relayerProcessor *relayer.RelayerProcessor
-	WorkerHandle     *worker.WorkerHandle
-	wsHub            *websocket.Hub
-	wsServer         *httputil.HTTPServer
-	shutdown         context.CancelCauseFunc
-	stopped          atomic.Bool
-	chainIdList      []uint64
+	DB                 *database.DB
+	metricsServer      *httputil.HTTPServer
+	metricsRegistry    *prometheus.Registry
+	phoenixMetrics     *metrics.PhoenixMetrics
+	marketPriceWorker  *market_task.MarketPriceWorker
+	fiatCurrencyWorker *market_task.FiatCurrencyWorker
+	wsHub              *websocket.Hub
+	wsServer           *httputil.HTTPServer
+	shutdown           context.CancelCauseFunc
+	stopped            atomic.Bool
+	chainIdList        []uint64
 }
 
 type RpcServerConfig struct {
@@ -49,7 +43,7 @@ type RpcServerConfig struct {
 }
 
 func NewWalletServices(ctx context.Context, cfg *config.Config, shutdown context.CancelCauseFunc) (*WalletServices, error) {
-	log.Info("New phoenix services start️ 🕖")
+	log.Info("New wallet services start️ 🕖")
 
 	metricsRegistry := metrics.NewRegistry()
 
@@ -63,21 +57,21 @@ func NewWalletServices(ctx context.Context, cfg *config.Config, shutdown context
 	if err := out.initFromConfig(ctx, cfg); err != nil {
 		return nil, errors.Join(err, out.Stop(ctx))
 	}
-	log.Info("New phoenix services success🏅️")
+	log.Info("New wallet services success🏅️")
 	return out, nil
 }
 
 func (as *WalletServices) Start(ctx context.Context) error {
-	errPhoenix := as.relayerProcessor.Start()
-	if errPhoenix != nil {
-		log.Error("start relayer processor fail", "err", errPhoenix)
-		return errPhoenix
+	errMpWorker := as.marketPriceWorker.Start()
+	if errMpWorker != nil {
+		log.Error("start worker handle fail", "err", errMpWorker)
+		return errMpWorker
 	}
 
-	errWorker := as.WorkerHandle.Start()
-	if errWorker != nil {
-		log.Error("start worker handle fail", "err", errWorker)
-		return errWorker
+	errFcwWorker := as.fiatCurrencyWorker.Start()
+	if errFcwWorker != nil {
+		log.Error("start worker handle fail", "err", errFcwWorker)
+		return errFcwWorker
 	}
 	return nil
 }
@@ -129,10 +123,6 @@ func (as *WalletServices) initFromConfig(ctx context.Context, cfg *config.Config
 		return fmt.Errorf("failed to start web socket server: %w", err)
 	}
 
-	if err := as.initRelayer(cfg); err != nil {
-		return fmt.Errorf("failed to init relayer processor: %w", err)
-	}
-
 	if err := as.initWorker(cfg); err != nil {
 		return fmt.Errorf("failed to init worker processor: %w", err)
 	}
@@ -173,19 +163,25 @@ func (as *WalletServices) initDB(ctx context.Context, cfg config.DBConfig) error
 }
 
 func (as *WalletServices) initWorker(config *config.Config) error {
-	var chainIds []string
-	for i := range config.RPCs {
-		chainIds = append(chainIds, strconv.Itoa(int(config.RPCs[i].ChainId)))
-	}
-	wkConfig := &worker.WorkerHandleConfig{
+	mwConfig := &market_task.MarketPriceWorkerConfig{
 		LoopInterval: time.Second * 5,
-		ChainIds:     chainIds,
 	}
-	workerHandle, err := worker.NewWorkerHandle(as.DB, wkConfig, as.wsHub, as.shutdown)
+	marketPriceWorker, err := market_task.NewMarketPriceWorker(as.DB, mwConfig, as.wsHub, as.shutdown)
 	if err != nil {
+		log.Error("new market price worker fail", "err", err)
 		return err
 	}
-	as.WorkerHandle = workerHandle
+	as.marketPriceWorker = marketPriceWorker
+
+	fiatCurrencyWorkerConfig := &market_task.FiatCurrencyWorkerConfig{
+		LoopInterval: time.Second * 5,
+	}
+	fiatCurrencyWorker, err := market_task.NewFiatCurrencyWorker(as.DB, fiatCurrencyWorkerConfig, as.wsHub, as.shutdown)
+	if err != nil {
+		log.Error("new fiat currency worker fail", "err", err)
+		return err
+	}
+	as.fiatCurrencyWorker = fiatCurrencyWorker
 	return nil
 }
 
@@ -196,66 +192,5 @@ func (as *WalletServices) startMetricsServer(cfg config.ServerConfig) error {
 	}
 	as.metricsServer = srv
 	log.Info("metrics server started", "port", cfg.Port, "addr", srv.Addr())
-	return nil
-}
-
-func (as *WalletServices) initRelayer(config *config.Config) error {
-	var ethClient map[uint64]*ethclient.Client
-	var poolMangerAddress map[uint64]string
-	var driverEngine map[uint64]driver.DriverEngine
-
-	for i := range config.RPCs {
-
-		rpcItem := config.RPCs[i]
-
-		ethClt, err := driver.EthClientWithTimeout(context.Background(), rpcItem.RpcUrl)
-		if err != nil {
-			log.Error("new eth client fail", "err", err)
-			return err
-		}
-
-		ecdsaPrivateKey, err := crypto.HexToECDSA(config.PrivateKey)
-		if err != nil {
-			log.Error("ecdsa format fail", "err", err)
-			return err
-		}
-		log.Info("init relayer start", "chainId", config.RPCs[i].ChainId, "RpcUrl", rpcItem.RpcUrl)
-
-		if ethClient == nil {
-			ethClient = make(map[uint64]*ethclient.Client)
-		}
-		ethClient[rpcItem.ChainId] = ethClt
-
-		if poolMangerAddress == nil {
-			poolMangerAddress = make(map[uint64]string)
-		}
-		poolMangerAddress[rpcItem.ChainId] = rpcItem.Contracts.ReferralRewardManager
-
-		dregConf := &driver.DriverEngineConfig{
-			ChainClient:               ethClt,
-			ChainId:                   big.NewInt(int64(rpcItem.ChainId)),
-			RrmManagerAddress:         common.HexToAddress(rpcItem.Contracts.ReferralRewardManager),
-			CallerAddress:             common.HexToAddress(config.CallerAddress),
-			PrivateKey:                ecdsaPrivateKey,
-			NumConfirmations:          config.NumConfirmations,
-			SafeAbortNonceTooLowCount: config.SafeAbortNonceTooLowCount,
-		}
-
-		drEngine, err := driver.NewDriverEngine(context.Background(), as.phoenixMetrics, dregConf)
-		if err != nil {
-			log.Error("new drive engine fail", "err", err)
-			return err
-		}
-		if driverEngine == nil {
-			driverEngine = make(map[uint64]driver.DriverEngine)
-		}
-		driverEngine[rpcItem.ChainId] = *drEngine
-	}
-	relayerProcessor, err := relayer.NewRelayerProcessor(as.DB, ethClient, poolMangerAddress, driverEngine, as.phoenixMetrics, as.wsHub, as.shutdown)
-	if err != nil {
-		log.Error("new relayer processor fail", "err", err)
-		return err
-	}
-	as.relayerProcessor = relayerProcessor
 	return nil
 }

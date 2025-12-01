@@ -1,4 +1,4 @@
-package worker
+package market_task
 
 import (
 	"context"
@@ -13,23 +13,22 @@ import (
 	"github.com/roothash-pay/wallet-services/services/websocket"
 )
 
-type WorkerHandleConfig struct {
+type FiatCurrencyWorkerConfig struct {
 	LoopInterval time.Duration
-	ChainIds     []string
 }
 
-type WorkerHandle struct {
+type FiatCurrencyWorker struct {
 	db             *database.DB
-	wConf          *WorkerHandleConfig
+	wConf          *FiatCurrencyWorkerConfig
 	wsHub          *websocket.Hub
 	resourceCtx    context.Context
 	resourceCancel context.CancelFunc
 	tasks          tasks.Group
 }
 
-func NewWorkerHandle(db *database.DB, wConf *WorkerHandleConfig, wsHub *websocket.Hub, shutdown context.CancelCauseFunc) (*WorkerHandle, error) {
+func NewFiatCurrencyWorker(db *database.DB, wConf *FiatCurrencyWorkerConfig, wsHub *websocket.Hub, shutdown context.CancelCauseFunc) (*FiatCurrencyWorker, error) {
 	resCtx, resCancel := context.WithCancel(context.Background())
-	return &WorkerHandle{
+	return &FiatCurrencyWorker{
 		db:             db,
 		wConf:          wConf,
 		wsHub:          wsHub,
@@ -43,21 +42,21 @@ func NewWorkerHandle(db *database.DB, wConf *WorkerHandleConfig, wsHub *websocke
 	}, nil
 }
 
-func (sh *WorkerHandle) Close() error {
-	sh.resourceCancel()
-	return sh.tasks.Wait()
+func (mpw *FiatCurrencyWorker) Close() error {
+	mpw.resourceCancel()
+	return mpw.tasks.Wait()
 }
 
-func (sh *WorkerHandle) Start() error {
-	workerTicker := time.NewTicker(sh.wConf.LoopInterval)
-	sh.tasks.Go(func() error {
+func (mpw *FiatCurrencyWorker) Start() error {
+	workerTicker := time.NewTicker(mpw.wConf.LoopInterval)
+	mpw.tasks.Go(func() error {
 		for range workerTicker.C {
 			log.Info("==== star ======")
 		}
 		return nil
 	})
 
-	sh.tasks.Go(func() error {
+	mpw.tasks.Go(func() error {
 		for range workerTicker.C {
 			log.Info("==== star ======")
 		}
