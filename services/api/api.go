@@ -155,6 +155,7 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 	/*
 	 * ============== frontend ===============
 	 */
+
 	a.router = apiRouter
 }
 

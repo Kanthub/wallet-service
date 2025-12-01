@@ -24,7 +24,7 @@ type TOTPKey struct {
 
 func NewAuthenticatorService(issuer string) *AuthenticatorService {
 	if issuer == "" {
-		issuer = "PHOENIX"
+		issuer = "WALLET"
 	}
 	return &AuthenticatorService{
 		issuer: issuer,

@@ -124,6 +124,14 @@ CREATE TABLE if not exists token (
     updated                 INTEGER CHECK (updated > 0)
 );
 
+CREATE TABLE if not exists chain_token (
+    guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
+    chain_uuid    VARCHAR(255) DEFAULT '',
+    token_uuid    VARCHAR(255) NOT NULL,
+    created       INTEGER CHECK (created > 0),
+    updated       INTEGER CHECK (updated > 0)
+)
+
 CREATE TABLE if not exists wallet (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     device_uuid   VARCHAR(255) NOT NULL,
@@ -147,7 +155,7 @@ CREATE TABLE if not exists wallet_address (
 
 CREATE TABLE if not exists wallet_asset (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    asset_uuid    VARCHAR(255) DEFAULT '',
+    token_uuid    VARCHAR(255) DEFAULT '',
     chain_uuid    VARCHAR(255) DEFAULT '',
     balance       INTEGER CHECK (balance > 0),
     asset_usdt    INTEGER CHECK (asset_usdt > 0),
@@ -167,7 +175,7 @@ CREATE TABLE if not exists asset_amount_stat (
 
 CREATE TABLE if not exists address_asset (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    asset_uuid    VARCHAR(255) DEFAULT '',
+    token_uuid    VARCHAR(255) DEFAULT '',
     wallet_uuid   VARCHAR(255) DEFAULT '',
     address_uuid  VARCHAR(255) DEFAULT '',
     asset_usdt    INTEGER CHECK (asset_usdt > 0),
@@ -181,7 +189,7 @@ CREATE TABLE if not exists wallet_tx_record (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     tx_time       VARCHAR(500) NOT NULL,
     chain_uuid    VARCHAR(255) DEFAULT '',
-    asset_uuid    VARCHAR(255) DEFAULT '',
+    token_uuid    VARCHAR(255) DEFAULT '',
     from_address  VARCHAR(70) NOT NULL,
     to_address    VARCHAR(70) NOT NULL,
     amount        INTEGER CHECK (amount > 0),
@@ -214,7 +222,7 @@ CREATE TABLE if not exists fiat_currency_rate (
 CREATE TABLE if not exists market_price (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     chain_uuid   VARCHAR(255) DEFAULT '',
-    asset_uuid   VARCHAR(255) DEFAULT '',
+    token_uuid   VARCHAR(255) DEFAULT '',
     usdt_price   INTEGER CHECK (usdt_price > 0),
     usd_price    INTEGER CHECK (usd_price > 0),
     market_cap   INTEGER CHECK (market_cap > 0),
