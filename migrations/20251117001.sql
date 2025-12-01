@@ -26,8 +26,8 @@ create table if not exists sys_log (
     user_id       BIGINT DEFAULT 0,
     order_number  VARCHAR(64) DEFAULT '',
     op            SMALLINT DEFAULT -1,     -- 操作类型(0添加;1编辑)
-    created        INTEGER CHECK (created > 0),
-    updated        INTEGER CHECK (updated > 0)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_syslog_cate ON sys_log (cate);
 CREATE INDEX idx_syslog_status ON sys_log (status);
@@ -46,8 +46,8 @@ create table if not exists auth (
     status       INT DEFAULT 1 COMMENT '状态(1启用;0禁用)',
     create_id    INT DEFAULT 0 COMMENT '创建人ID',
     update_id    INT DEFAULT 0 COMMENT '修改人ID',
-    created      INTEGER CHECK (created > 0),
-    updated      INTEGER CHECK (updated > 0)
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_auth_user_id   ON auth (user_id);
 CREATE INDEX idx_auth_pid       ON auth (pid);
@@ -62,8 +62,8 @@ create table if not exists role (
     status       INT DEFAULT 1 COMMENT '状态(1启用;0禁用)',
     create_id    INT DEFAULT 0 COMMENT '创建人ID',
     update_id    INT DEFAULT 0 COMMENT '修改人ID',
-    created      INTEGER CHECK (created > 0),
-    updated      INTEGER CHECK (updated > 0)
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_role_role_name ON role (role_name);
 
@@ -90,8 +90,8 @@ create table if not exists admin (
     status        INT DEFAULT 1,                  -- 状态(1启用;0禁用) --
     create_id     INT DEFAULT 0,                  -- 创建人 --
     update_id     INT DEFAULT 0,                  -- 修改人 --
-    created       INTEGER CHECK (created > 0),
-    updated       INTEGER CHECK (updated > 0)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_admin_status ON admin (status);
 CREATE INDEX idx_admin_create_id ON admin (create_id);
@@ -105,9 +105,12 @@ CREATE TABLE if not exists chain (
     chain_logo         VARCHAR(200) NOT NULL,
     chain_active_logo  VARCHAR(200) NOT NULL,
     chain_model_type   VARCHAR(10) NOT NULL,  --utxo/account--
-    created            INTEGER CHECK (created > 0),
-    updated            INTEGER CHECK (updated > 0)
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_chain_guid ON chain (guid);
+CREATE INDEX idx_chain_name_guid ON chain (chain_name);
+
 
 CREATE TABLE if not exists token (
     guid                    TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
@@ -120,17 +123,21 @@ CREATE TABLE if not exists token (
     token_contract_address  VARCHAR(70) NOT NULL,
     token_chain_uuid        VARCHAR(255) DEFAULT '',
     is_hot                  VARCHAR(32) NOT NULL DEFAULT 'hot',
-    created                 INTEGER CHECK (created > 0),
-    updated                 INTEGER CHECK (updated > 0)
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_token_guid ON chain (guid);
+CREATE INDEX idx_token_token_name ON chain (token_name);
 
 CREATE TABLE if not exists chain_token (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     chain_uuid    VARCHAR(255) DEFAULT '',
     token_uuid    VARCHAR(255) NOT NULL,
-    created       INTEGER CHECK (created > 0),
-    updated       INTEGER CHECK (updated > 0)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
+CREATE INDEX idx_chain_token_guid ON chain_token (guid);
+CREATE INDEX idx_chain_token_chain_uuid ON chain_token (chain_uuid);
 
 CREATE TABLE if not exists wallet (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
@@ -138,52 +145,64 @@ CREATE TABLE if not exists wallet (
     wallet_uuid   VARCHAR(255) NOT NULL,
     chain_uuid    VARCHAR(255) DEFAULT '',
     wallet_name   VARCHAR(70) DEFAULT 'roothash',
-    asset_usdt    INTEGER CHECK (asset_usdt > 0),
-    asset_usd     INTEGER CHECK (asset_usd > 0),
-    created       INTEGER CHECK (created > 0),
-    updated       INTEGER CHECK (updated > 0)
+    asset_usdt    NUMERIC(20, 8) NOT NULL,
+    asset_usd     NUMERIC(20, 8) NOT NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_wallet_guid ON wallet (guid);
+CREATE INDEX idx_wallet_wallet_uuid ON wallet (wallet_uuid);
 
 CREATE TABLE if not exists wallet_address (
     guid             TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     address_index    INTEGER CHECK (address_index > 0),
     address          VARCHAR(70) NOT NULL,
     wallet_uuid      VARCHAR(255) DEFAULT ''
-    created          INTEGER CHECK (created > 0),
-    updated          INTEGER CHECK (updated > 0)
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_wallet_address_guid ON wallet_address (guid);
+CREATE INDEX idx_wallet_address_wallet_uuid ON wallet_address (wallet_uuid);
 
 CREATE TABLE if not exists wallet_asset (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     token_uuid    VARCHAR(255) DEFAULT '',
     chain_uuid    VARCHAR(255) DEFAULT '',
     balance       INTEGER CHECK (balance > 0),
-    asset_usdt    INTEGER CHECK (asset_usdt > 0),
-    asset_usd     INTEGER CHECK (asset_usd > 0),
-    created       INTEGER CHECK (created > 0),
-    updated       INTEGER CHECK (updated > 0)
+    asset_usdt    NUMERIC(20, 8) NOT NULL,
+    asset_usd     NUMERIC(20, 8) NOT NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_wallet_asset_guid ON wallet_asset (guid);
+CREATE INDEX idx_wallet_asset_chain_uuid ON wallet_address (chain_uuid);
 
 CREATE TABLE if not exists asset_amount_stat (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     asset_uuid    VARCHAR(255) DEFAULT '',
     time_date     VARCHAR(255) NOT NULL,
     amount        INTEGER CHECK (amount > 0),
-    created       INTEGER CHECK (created > 0),
-    updated       INTEGER CHECK (updated > 0)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_asset_amount_stat_guid ON asset_amount_stat (guid);
+CREATE INDEX idx_asset_amount_stat_asset_uuid ON asset_amount_stat (asset_uuid);
+
 
 CREATE TABLE if not exists address_asset (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     token_uuid    VARCHAR(255) DEFAULT '',
     wallet_uuid   VARCHAR(255) DEFAULT '',
     address_uuid  VARCHAR(255) DEFAULT '',
-    asset_usdt    INTEGER CHECK (asset_usdt > 0),
-    asset_usd     INTEGER CHECK (asset_usd > 0),
+    asset_usdt    NUMERIC(20, 8) NOT NULL,
+    asset_usd     NUMERIC(20, 8) NOT NULL,
     balance       INTEGER CHECK (balance > 0),
-    created       INTEGER CHECK (created > 0),
-    updated       INTEGER CHECK (updated > 0)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_address_asset_guid ON address_asset (guid);
+CREATE INDEX idx_address_asset_address_uuid ON address_asset (address_uuid);
+
 
 CREATE TABLE if not exists wallet_tx_record (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
@@ -197,9 +216,13 @@ CREATE TABLE if not exists wallet_tx_record (
     hash          VARCHAR(500) NOT NULL,
     block_height  VARCHAR(500) NOT NULL,
     explorer_url  VARCHAR(500) NOT NULL,
-    created       INTEGER CHECK (created > 0),
-    updated       INTEGER CHECK (updated > 0)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_wallet_tx_record_guid ON wallet_tx_record (guid);
+CREATE INDEX idx_wallet_tx_record_from_address ON wallet_tx_record (from_address);
+CREATE INDEX idx_wallet_tx_record_to_address ON wallet_tx_record (to_address);
+
 
 CREATE TABLE if not exists wallet_address_note (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
@@ -207,35 +230,44 @@ CREATE TABLE if not exists wallet_address_note (
     chain_uuid   VARCHAR(255) DEFAULT '',
     memo         VARCHAR(255) NOT NULL,
     address      VARCHAR(255) NOT NULL,
-    created      INTEGER CHECK (created > 0),
-    updated      INTEGER CHECK (updated > 0)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_wallet_address_note_guid ON wallet_address_note (guid);
+CREATE INDEX idx_wallet_address_note_device_uuid ON wallet_address_note (device_uuid);
+
 
 CREATE TABLE if not exists fiat_currency_rate (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     key_name     VARCHAR(255) NOT NULL,
     value_data   VARCHAR(255) NOT NULL,
-    created      INTEGER CHECK (created > 0),
-    updated      INTEGER CHECK (updated > 0)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
+CREATE INDEX idx_fiat_currency_rate_guid ON fiat_currency_rate (guid);
+CREATE INDEX idx_fiat_currency_rate_key_name ON fiat_currency_rate (key_name);
+
 
 CREATE TABLE if not exists market_price (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     chain_uuid   VARCHAR(255) DEFAULT '',
     token_uuid   VARCHAR(255) DEFAULT '',
-    usdt_price   INTEGER CHECK (usdt_price > 0),
-    usd_price    INTEGER CHECK (usd_price > 0),
+    usdt_price   NUMERIC(20, 8) NOT NULL,
+    usd_price    NUMERIC(20, 8) NOT NULL,
     market_cap   INTEGER CHECK (market_cap > 0),
     liquidity    INTEGER CHECK (liquidity > 0),
     24h_volume   INTEGER CHECK (liquidity > 0),
     price_change VARCHAR(255) NOT NULL,
     ranking      VARCHAR(255) NOT NULL,
-    created      INTEGER CHECK (created > 0),
-    updated      INTEGER CHECK (updated > 0)
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
+CREATE INDEX idx_market_price_guid ON market_price (guid);
+CREATE INDEX idx_market_price_token_uuid ON market_price (key_name);
+
 
 CREATE TABLE IF NOT EXISTS kline (
-    guid          VARCHAR PRIMARY KEY,
+    guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     token_id      VARCHAR NOT NULL,
     time_interval VARCHAR NOT NULL,          -- K线周期，如 1m, 5m, 1h, 1d --
     open_time     TIMESTAMP NOT NULL,        -- 开始时间 --
@@ -252,5 +284,23 @@ CREATE TABLE IF NOT EXISTS kline (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_kline_interval_time ON kline(token_id, time_interval, open_time);
 CREATE INDEX IF NOT EXISTS idx_kline_time ON kline(symbol_id, open_time DESC);
 
+CREATE TABLE IF NOT EXISTS newsletter_cat (
+    guid          VARCHAR PRIMARY KEY,
+    cat_name      VARCHAR NOT NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_guid ON newsletter_cat(guid);
 
-
+CREATE TABLE IF NOT EXISTS newsletter (
+    guid          VARCHAR PRIMARY KEY,
+    cat_uuid      VARCHAR(255) NOT NULL,
+    title         VARCHAR(255) NOT NULL,
+    image         VARCHAR(700) NOT NULL,
+    detail        TEXT DEFAULT '',
+    link_url      VARCHAR(255) NOT NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_guid ON newsletter(guid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_uuid ON newsletter(cat_uuid);
