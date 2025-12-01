@@ -1,2 +1,1 @@
-# wallet-services
-roothash wallet services
+# event-services

@@ -1,0 +1,4 @@
+.env
+.idea
+./event-services
+event-services

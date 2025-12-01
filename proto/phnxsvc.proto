@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option go_package = "./proto/multimarket";
+option java_package = "com.multimarket.protocol";
+package multimarket.protocol;
+
+
+message QueryFeeRequest {
+  string consumer_token = 1;
+  uint64 chain_id = 2;
+}
+
+message QueryFeeResponse {
+  uint64 return_code =1;
+  string message = 2;
+}
+
+service PhoenixServices {
+  rpc queryFeeByChainId(QueryFeeRequest) returns (QueryFeeResponse) {}
+}
