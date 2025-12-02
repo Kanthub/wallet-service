@@ -1,20 +1,22 @@
 package backend
 
 import (
-	"gorm.io/gorm"
+	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"gorm.io/gorm"
 )
 
 type Role struct {
-	ID         int64  `gorm:"primaryKey;column:id" json:"id"`
-	RoleName   string `gorm:"type:varchar(100);default:''" json:"role_name"` // 角色名称
-	Detail     string `gorm:"type:varchar(255);default:''" json:"detail"`    // 角色描述/说明
-	Status     int    `gorm:"type:int;default:1" json:"status"`              // 状态(1启用;0禁用)
-	CreateID   int    `gorm:"type:int;default:0" json:"create_id"`           // 创建人ID
-	UpdateID   int    `gorm:"type:int;default:0" json:"update_id"`           // 修改人ID
-	CreateTime int64  `gorm:"type:bigint;default:0" json:"create_time"`      // 创建时间(Unix时间戳)
-	UpdateTime int64  `gorm:"type:bigint;default:0" json:"update_time"`      // 更新时间(Unix时间戳)
+	Guid       string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
+	RoleName   string    `gorm:"column:role_name;type:varchar(100);default:''" json:"role_name"`
+	Detail     string    `gorm:"column:detail;type:varchar(255);default:''" json:"detail"`
+	Status     int64     `gorm:"column:status;type:int;default:1" json:"status"`
+	CreateID   int64     `gorm:"column:create_id;type:int;default:0" json:"create_id"`
+	UpdateID   int64     `gorm:"column:update_id;type:int;default:0" json:"update_id"`
+	CreateTime time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
+	UpdateTime time.Time `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
 }
 
 func (Role) TableName() string {
@@ -22,15 +24,16 @@ func (Role) TableName() string {
 }
 
 type RoleView interface {
-	GetByID(id int64) (*Role, error)
-	GetByStatus(status int) ([]*Role, error)
+	GetByGuid(guid string) (*Role, error)
+	GetRoleList(page, pageSize int, filters map[string]interface{}) ([]*Role, int64, error)
 }
 
 type RoleDB interface {
 	RoleView
 
 	StoreRole(role *Role) error
-	StoreRoles(roles []*Role) error
+	StoreRoles(list []*Role) error
+	UpdateRole(guid string, updates map[string]interface{}) error
 }
 
 type roleDB struct {
@@ -41,36 +44,81 @@ func NewRoleDB(db *gorm.DB) RoleDB {
 	return &roleDB{gorm: db}
 }
 
-func (db *roleDB) StoreRole(role *Role) error {
-	if err := db.gorm.Create(role).Error; err != nil {
-		log.Error("StoreRole error:", err)
+func (db *roleDB) StoreRole(r *Role) error {
+	if err := db.gorm.Create(r).Error; err != nil {
+		log.Error("StoreRole error", "err", err)
 		return err
 	}
 	return nil
 }
 
-func (db *roleDB) StoreRoles(roles []*Role) error {
-	if err := db.gorm.CreateInBatches(roles, len(roles)).Error; err != nil {
-		log.Error("StoreRoles error:", err)
+func (db *roleDB) StoreRoles(list []*Role) error {
+	if err := db.gorm.CreateInBatches(list, len(list)).Error; err != nil {
+		log.Error("StoreRoles error", "err", err)
 		return err
 	}
 	return nil
 }
 
-func (db *roleDB) GetByID(id int64) (*Role, error) {
-	var role Role
-	if err := db.gorm.First(&role, id).Error; err != nil {
-		log.Error("GetByID error:", err)
+func (db *roleDB) GetByGuid(guid string) (*Role, error) {
+	var r Role
+	if err := db.gorm.Where("guid = ?", guid).First(&r).Error; err != nil {
+		log.Error("GetByGuid role error", "err", err)
 		return nil, err
 	}
-	return &role, nil
+	return &r, nil
 }
 
-func (db *roleDB) GetByStatus(status int) ([]*Role, error) {
+func (db *roleDB) GetRoleList(page, pageSize int, filters map[string]interface{}) ([]*Role, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
 	var list []*Role
-	if err := db.gorm.Where("status = ?", status).Find(&list).Error; err != nil {
-		log.Error("GetByStatus error:", err)
-		return nil, err
+	query := db.gorm.Model(&Role{})
+
+	for key, value := range filters {
+		if value == nil || value == "" {
+			continue
+		}
+		switch key {
+		case "role_name", "detail":
+			query = query.Where(key+" LIKE ?", "%"+value.(string)+"%")
+		default:
+			query = query.Where(key+" = ?", value)
+		}
 	}
-	return list, nil
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		log.Error("GetRoleList count error", "err", err)
+		return nil, 0, err
+	}
+
+	if err := query.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&list).Error; err != nil {
+		log.Error("GetRoleList list error", "err", err)
+		return nil, 0, err
+	}
+
+	return list, total, nil
+}
+
+func (db *roleDB) UpdateRole(guid string, updates map[string]interface{}) error {
+	if guid == "" {
+		return fmt.Errorf("invalid guid")
+	}
+	if len(updates) == 0 {
+		return fmt.Errorf("updates is empty")
+	}
+	updates["updated_at"] = time.Now()
+
+	if err := db.gorm.Model(&Role{}).Where("guid = ?", guid).Updates(updates).Error; err != nil {
+		log.Error("UpdateRole error", "err", err)
+		return err
+	}
+	return nil
 }
