@@ -13,7 +13,7 @@ type AdminLoginResponse struct {
 }
 
 type AdminInfo struct {
-	ID       uint64 `json:"guid"`
+	Guid     string `json:"guid"`
 	Username string `json:"username"`
 }
 
