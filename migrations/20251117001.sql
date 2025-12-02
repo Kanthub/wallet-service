@@ -15,7 +15,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" cascade;
 create table if not exists sys_log (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     action        VARCHAR(100) DEFAULT '', -- 路径 --
-    desc          VARCHAR(100) DEFAULT '', -- 描述 --
+    remark          VARCHAR(100) DEFAULT '', -- 描述 --
     admin         VARCHAR(30)  DEFAULT '', -- 操作管理员 --
     ip            VARCHAR(30)  DEFAULT '', -- 操作管理员 IP --
     cate          SMALLINT DEFAULT 0,      -- 类型(0表示其他;1=>表示登陆;2=>表示财务操作) --
