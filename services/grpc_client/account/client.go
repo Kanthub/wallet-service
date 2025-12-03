@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/dapplink-labs/wallet-chain-account/rpc/common"
 	pb "github.com/roothash-pay/wallet-services/proto/account"
 )
 
@@ -27,7 +28,7 @@ type SendTxParams struct {
 }
 
 type SendTxResult struct {
-	Code   int32
+	Code   common.ReturnCode
 	Msg    string
 	TxHash string
 }
@@ -69,6 +70,59 @@ func (c *WalletAccountClient) SendTx(ctx context.Context, params SendTxParams) (
 		Code:   resp.Code,
 		Msg:    resp.Msg,
 		TxHash: resp.TxHash,
+	}, nil
+}
+
+// TxInfo represents transaction information
+type TxInfo struct {
+	Hash            string
+	Status          pb.TxStatus
+	Height          string
+	From            string
+	To              string
+	Value           string
+	Fee             string
+	ContractAddress string
+	Datetime        string
+}
+
+// GetTxByHash queries transaction details by hash
+func (c *WalletAccountClient) GetTxByHash(ctx context.Context, consumerToken, chain, coin, network, txHash string) (*TxInfo, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req := &pb.TxHashRequest{
+		ConsumerToken: consumerToken,
+		Chain:         chain,
+		Coin:          coin,
+		Network:       network,
+		Hash:          txHash,
+	}
+
+	resp, err := c.client.GetTxByHash(ctx, req)
+	if err != nil {
+		log.Error("GetTxByHash RPC failed", "err", err)
+		return nil, fmt.Errorf("failed to get transaction: %w", err)
+	}
+
+	if resp.Code != common.ReturnCode_SUCCESS {
+		return nil, fmt.Errorf("get transaction failed: %s", resp.Msg)
+	}
+
+	if resp.Tx == nil {
+		return nil, fmt.Errorf("transaction not found")
+	}
+
+	return &TxInfo{
+		Hash:            resp.Tx.Hash,
+		Status:          resp.Tx.Status,
+		Height:          resp.Tx.Height,
+		From:            resp.Tx.From,
+		To:              resp.Tx.To,
+		Value:           resp.Tx.Value,
+		Fee:             resp.Tx.Fee,
+		ContractAddress: resp.Tx.ContractAddress,
+		Datetime:        resp.Tx.Datetime,
 	}, nil
 }
 

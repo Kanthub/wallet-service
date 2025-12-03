@@ -4,13 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/roothash-pay/wallet-services/services/api/validator"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/evm"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/solana"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/store"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/utils"
+	"github.com/roothash-pay/wallet-services/services/api/validator"
+	"github.com/roothash-pay/wallet-services/services/grpc_client/account"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/go-chi/chi/v5"
@@ -156,6 +163,16 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 	 * ============== frontend ===============
 	 */
 
+	// Initialize Aggregator service and register routes
+	aggregatorService, err := a.initAggregatorService(cfg)
+	if err != nil {
+		log.Error("failed to initialize Aggregator service", "err", err)
+	} else if aggregatorService != nil {
+		aggregatorRoutes := routes.NewAggregatorRoutes(aggregatorService)
+		aggregatorRoutes.RegisterRoutes(apiRouter)
+		log.Info("Aggregator routes registered successfully")
+	}
+
 	a.router = apiRouter
 }
 
@@ -226,4 +243,74 @@ func parseCORSOrigins(origins string) []string {
 		}
 	}
 	return result
+}
+
+// initAggregatorService initializes the aggregator service with all dependencies
+func (a *API) initAggregatorService(cfg *config.Config) (*service.AggregatorService, error) {
+	// Skip initialization if wallet account address is not configured
+	if cfg.AggregatorConfig.WalletAccountAddr == "" {
+		log.Warn("Aggregator service not initialized: wallet_account_addr not configured")
+		return nil, nil
+	}
+
+	// Create wallet account client
+	accountClient, err := account.NewWalletAccountClient(cfg.AggregatorConfig.WalletAccountAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create wallet account client: %w", err)
+	}
+
+	// Create providers
+	var providers []provider.Provider
+
+	// Initialize 0x provider if enabled
+	if cfg.AggregatorConfig.EnableProviders["0x"] && cfg.AggregatorConfig.ZeroXAPIURL != "" {
+		zeroXProvider := evm.NewZeroXProvider(cfg.AggregatorConfig.ZeroXAPIURL, cfg.AggregatorConfig.ZeroXAPIKey)
+		providers = append(providers, zeroXProvider)
+		log.Info("0x provider initialized", "url", cfg.AggregatorConfig.ZeroXAPIURL)
+	}
+
+	// Initialize 1inch provider if enabled
+	if cfg.AggregatorConfig.EnableProviders["1inch"] && cfg.AggregatorConfig.OneInchAPIURL != "" {
+		oneInchProvider := evm.NewOneInchProvider(cfg.AggregatorConfig.OneInchAPIURL, cfg.AggregatorConfig.OneInchAPIKey)
+		providers = append(providers, oneInchProvider)
+		log.Info("1inch provider initialized", "url", cfg.AggregatorConfig.OneInchAPIURL)
+	}
+
+	// Initialize Jupiter provider if enabled
+	if cfg.AggregatorConfig.EnableProviders["jupiter"] && cfg.AggregatorConfig.JupiterAPIURL != "" {
+		jupiterProvider := solana.NewJupiterProvider(cfg.AggregatorConfig.JupiterAPIURL)
+		providers = append(providers, jupiterProvider)
+		log.Info("Jupiter provider initialized", "url", cfg.AggregatorConfig.JupiterAPIURL)
+	}
+
+	// Initialize LiFi provider if enabled
+	if cfg.AggregatorConfig.EnableProviders["lifi"] && cfg.AggregatorConfig.LiFiAPIURL != "" {
+		lifiProvider := evm.NewLiFiProvider(cfg.AggregatorConfig.LiFiAPIURL, cfg.AggregatorConfig.LiFiAPIKey)
+		providers = append(providers, lifiProvider)
+		log.Info("LiFi provider initialized", "url", cfg.AggregatorConfig.LiFiAPIURL)
+	}
+
+	if len(providers) == 0 {
+		log.Warn("Aggregator service not initialized: no providers enabled")
+		return nil, nil
+	}
+
+	// Create stores
+	quoteStore := store.NewInMemoryQuoteStore()
+	swapStore := store.NewInMemorySwapStore()
+
+	// Create validator
+	validator := utils.NewValidator()
+
+	// Create aggregator service
+	aggregatorService := service.NewAggregatorService(
+		providers,
+		quoteStore,
+		swapStore,
+		validator,
+		accountClient,
+	)
+
+	log.Info("Aggregator service initialized successfully", "providers", len(providers))
+	return aggregatorService, nil
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/roothash-pay/wallet-services/common/httputil"
 )
-
+ 
 func StartServer(r *prometheus.Registry, hostname string, port int) (*httputil.HTTPServer, error) {
 	addr := net.JoinHostPort(hostname, strconv.Itoa(port))
 	h := promhttp.InstrumentMetricHandler(

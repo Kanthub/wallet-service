@@ -15,7 +15,7 @@ import (
 	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	"github.com/roothash-pay/wallet-services/services/api"
-	grpc "github.com/roothash-pay/wallet-services/services/gprc"
+	grpc "github.com/roothash-pay/wallet-services/services/grpc"
 	"github.com/roothash-pay/wallet-services/services/grpc_client/account"
 )
 
@@ -142,10 +142,11 @@ func runSendTx(ctx *cli.Context, _ context.CancelCauseFunc) (cliapp.Lifecycle, e
 
 	// Send transaction
 	result, err := client.SendTx(ctx.Context, account.SendTxParams{
-		Chain:   "Ethereum",
-		Coin:    "ETH",
-		Network: "testnet",
-		RawTx:   rawTx,
+		ConsumerToken: "", // TODO: Get from config
+		Chain:         "Ethereum",
+		Coin:          "ETH",
+		Network:       "testnet",
+		RawTx:         rawTx,
 	})
 
 	if err != nil {
