@@ -3,17 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
 	relayer_node "github.com/roothash-pay/wallet-services"
+	"github.com/roothash-pay/wallet-services/common/chain/eth"
 	"github.com/roothash-pay/wallet-services/common/cliapp"
 	"github.com/roothash-pay/wallet-services/common/opio"
 	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	"github.com/roothash-pay/wallet-services/services/api"
 	grpc "github.com/roothash-pay/wallet-services/services/gprc"
+	"github.com/roothash-pay/wallet-services/services/grpc_client/account"
 )
 
 var (
@@ -95,6 +98,66 @@ func runRpc(ctx *cli.Context, _ context.CancelCauseFunc) (cliapp.Lifecycle, erro
 	return grpc.NewPhoenixRpcService(grpcServerCfg, db)
 }
 
+func runSendTx(ctx *cli.Context, _ context.CancelCauseFunc) (cliapp.Lifecycle, error) {
+	log.Info("Testing transaction signing and broadcasting...")
+
+	// Example parameters - in production these would come from config or flags
+	privateKeyHex := "your_private_key_here"                      // TODO: Replace with actual private key
+	rpcURL := "https://eth-sepolia.g.alchemy.com/v2/your-api-key" // TODO: Replace with actual RPC URL
+	chainID := big.NewInt(11155111)                               // Sepolia testnet
+	walletAccountAddr := "127.0.0.1:8189"
+
+	// Create signer
+	signer, err := eth.NewSigner(privateKeyHex, chainID)
+	if err != nil {
+		log.Error("Failed to create signer", "err", err)
+		return nil, err
+	}
+
+	log.Info("Signer created", "address", signer.GetAddress())
+
+	// Sign transaction
+	txParams := eth.TxParams{
+		To:       "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+		Value:    big.NewInt(1000000000000000), // 0.001 ETH
+		GasLimit: 21000,
+		Data:     []byte{},
+	}
+
+	rawTx, err := signer.SignTransaction(ctx.Context, rpcURL, txParams)
+	if err != nil {
+		log.Error("Failed to sign transaction", "err", err)
+		return nil, err
+	}
+
+	log.Info("Transaction signed", "rawTx", rawTx)
+
+	// Create wallet account client
+	client, err := account.NewWalletAccountClient(walletAccountAddr)
+	if err != nil {
+		log.Error("Failed to create wallet account client", "err", err)
+		return nil, err
+	}
+	defer client.Close()
+
+	// Send transaction
+	result, err := client.SendTx(ctx.Context, account.SendTxParams{
+		Chain:   "Ethereum",
+		Coin:    "ETH",
+		Network: "testnet",
+		RawTx:   rawTx,
+	})
+
+	if err != nil {
+		log.Error("Failed to send transaction", "err", err)
+		return nil, err
+	}
+
+	log.Info("Transaction sent", "code", result.Code, "msg", result.Msg, "txHash", result.TxHash)
+
+	return nil, nil
+}
+
 func NewCli() *cli.App {
 	flags := []cli.Flag{ConfigFlag}
 	migrationFlags := []cli.Flag{MigrationsFlag, ConfigFlag}
@@ -126,6 +189,12 @@ func NewCli() *cli.App {
 				Flags:       migrationFlags,
 				Description: "Run event database migrations",
 				Action:      runMigrations,
+			},
+			{
+				Name:        "send-tx",
+				Flags:       flags,
+				Description: "Test sending a signed transaction via wallet-chain-account service",
+				Action:      cliapp.LifecycleCmd(runSendTx),
 			},
 			{
 				Name:        "event version",
