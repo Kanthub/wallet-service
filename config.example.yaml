@@ -1,0 +1,43 @@
+# HTTP 服务器
+http_server:
+  host: "0.0.0.0"
+  port: 8080
+
+# 数据库
+master_db:
+  host: "localhost"
+  port: 5432
+  name: "wallet_services"
+  user: "postgres"
+  password: "your_password"
+
+# JWT
+jwt_secret: "your-dev-secret-key"
+
+# 闪兑聚合器
+aggregator_config:
+  wallet_account_addr: "127.0.0.1:8189"
+  wallet_account_consumer_token: ""
+  chain_consumer_tokens:
+    "1": ""
+  
+  # 0x Protocol
+  zerox_api_url: "https://api.0x.org"
+  zerox_api_key: ""
+  
+  # 1inch
+  oneinch_api_url: "https://api.1inch.dev"
+  oneinch_api_key: ""
+  
+  # Jupiter
+  jupiter_api_url: "https://quote-api.jup.ag"
+  
+  # LiFi
+  lifi_api_url: "https://li.quest/v1"
+  lifi_api_key: ""
+
+  enable_providers:
+    0x: false
+    1inch: false
+    jupiter: false
+    lifi: true

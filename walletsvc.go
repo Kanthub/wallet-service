@@ -16,10 +16,14 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/roothash-pay/wallet-services/common/httputil"
+	"github.com/roothash-pay/wallet-services/common/redis"
 	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	"github.com/roothash-pay/wallet-services/metrics"
+	"github.com/roothash-pay/wallet-services/services/common/chaininfo"
+	"github.com/roothash-pay/wallet-services/services/grpc_client/account"
 	"github.com/roothash-pay/wallet-services/services/websocket"
+	"github.com/roothash-pay/wallet-services/worker/aggregator_task"
 	"github.com/roothash-pay/wallet-services/worker/market_task"
 )
 
@@ -30,6 +34,7 @@ type WalletServices struct {
 	phoenixMetrics     *metrics.PhoenixMetrics
 	marketPriceWorker  *market_task.MarketPriceWorker
 	fiatCurrencyWorker *market_task.FiatCurrencyWorker
+	txRecordWorker     *aggregator_task.WalletTxRecordWorker
 	wsHub              *websocket.Hub
 	wsServer           *httputil.HTTPServer
 	shutdown           context.CancelCauseFunc
@@ -64,20 +69,34 @@ func NewWalletServices(ctx context.Context, cfg *config.Config, shutdown context
 func (as *WalletServices) Start(ctx context.Context) error {
 	errMpWorker := as.marketPriceWorker.Start()
 	if errMpWorker != nil {
-		log.Error("start worker handle fail", "err", errMpWorker)
+		log.Error("start market price worker fail", "err", errMpWorker)
 		return errMpWorker
 	}
 
 	errFcwWorker := as.fiatCurrencyWorker.Start()
 	if errFcwWorker != nil {
-		log.Error("start worker handle fail", "err", errFcwWorker)
+		log.Error("start fiat currency worker fail", "err", errFcwWorker)
 		return errFcwWorker
 	}
+
+	// Start tx record worker if initialized
+	if as.txRecordWorker != nil {
+		as.txRecordWorker.Start()
+		log.Info("Wallet tx record worker started")
+	}
+
 	return nil
 }
 
 func (as *WalletServices) Stop(ctx context.Context) error {
 	var result error
+
+	// Stop tx record worker first
+	if as.txRecordWorker != nil {
+		log.Info("Stopping wallet tx record worker...")
+		as.txRecordWorker.Stop()
+	}
+
 	if as.DB != nil {
 		if err := as.DB.Close(); err != nil {
 			result = errors.Join(result, fmt.Errorf("failed to close DB: %w", err))
@@ -182,6 +201,53 @@ func (as *WalletServices) initWorker(config *config.Config) error {
 		return err
 	}
 	as.fiatCurrencyWorker = fiatCurrencyWorker
+
+	// Initialize wallet tx record worker if aggregator is enabled
+	if config.AggregatorConfig.WalletAccountAddr != "" {
+		accountClient, err := account.NewWalletAccountClient(config.AggregatorConfig.WalletAccountAddr)
+		if err != nil {
+			log.Warn("failed to create wallet account client for tx worker", "err", err)
+		} else {
+			var chainInfoRedis *redis.Client
+			if config.RedisConfig.Addr != "" {
+				chainInfoRedis, err = redis.NewClient(&config.RedisConfig)
+				if err != nil {
+					log.Warn("failed to init redis for chain info cache", "err", err)
+				}
+			}
+			chainInfoManager := chaininfo.NewManager(
+				as.DB.BackendChain,
+				chainInfoRedis,
+				config.AggregatorConfig.WalletAccountConsumerToken,
+				config.AggregatorConfig.ChainConsumerTokens,
+			)
+			if warmErr := chainInfoManager.WarmUp(context.Background()); warmErr != nil {
+				log.Warn("failed to warm up chain info cache for worker", "err", warmErr)
+			}
+
+			txWorkerConfig := aggregator_task.WalletTxRecordWorkerConfig{
+				ScanInterval:         10,   // 10 seconds
+				LastCheckedThreshold: 5,    // 5 seconds
+				BatchSize:            100,  // 100 records per batch
+				Concurrency:          10,   // 10 concurrent workers
+				TimeoutThreshold:     3600, // 1 hour timeout
+			}
+			txRecordWorker := aggregator_task.NewWalletTxRecordWorker(
+				as.DB.BackendWalletTxRecord,
+				accountClient,
+				chainInfoManager,
+				txWorkerConfig,
+			)
+			as.txRecordWorker = txRecordWorker
+			log.Info("Wallet tx record worker initialized",
+				"scanInterval", txWorkerConfig.ScanInterval,
+				"concurrency", txWorkerConfig.Concurrency,
+				"timeout", txWorkerConfig.TimeoutThreshold)
+		}
+	} else {
+		log.Info("Wallet tx record worker not initialized: wallet_account_addr not configured")
+	}
+
 	return nil
 }
 

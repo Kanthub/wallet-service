@@ -10,33 +10,30 @@ import (
 )
 
 type Config struct {
-	Migrations                string       `yaml:"migrations"`
-	MasterDB                  DBConfig     `yaml:"master_db"`
-	SlaveDB                   DBConfig     `yaml:"slave_db"`
-	SlaveDbEnable             bool         `yaml:"slave_db_enable"`
-	ApiCacheEnable            bool         `yaml:"api_cache_enable"`
-	CacheConfig               CacheConfig  `yaml:"cache_config"`
-	RpcServer                 ServerConfig `yaml:"rpc_server"`
-	MetricsServer             ServerConfig `yaml:"metrics_server"`
-	HttpServer                ServerConfig `yaml:"http_server"`
-	WebsocketServer           ServerConfig `yaml:"websocket_server"`
-	EmailConfig               EmailConfig  `yaml:"email_config"`
-	SMSConfig                 SMSConfig    `yaml:"sms_config"`
-	MinioConfig               MinioConfig  `yaml:"minio_config"`
-	KodoConfig                KodoConfig   `yaml:"kodo_config"`
-	S3Config                  S3Config     `yaml:"s3_config"`
-	CORSAllowedOrigins        string       `yaml:"cors_allowed_origins"`
-	JWTSecret                 string       `yaml:"jwt_secret"`
-	Domain                    string       `yaml:"domain"`
-	PrivateKey                string       `yaml:"private_key"`
-	NumConfirmations          uint64       `yaml:"num_confirmations"`
-	SafeAbortNonceTooLowCount uint64       `yaml:"safe_abort_nonce_too_low_count"`
-	CallerAddress             string       `yaml:"caller_address"`
-}
-
-type WalletChainConfig struct {
-	RpcUrl        string `yaml:"rpc_url"`
-	ConsumerToken string `yaml:"consumer_token"`
+	Migrations                string           `yaml:"migrations"`
+	MasterDB                  DBConfig         `yaml:"master_db"`
+	SlaveDB                   DBConfig         `yaml:"slave_db"`
+	SlaveDbEnable             bool             `yaml:"slave_db_enable"`
+	ApiCacheEnable            bool             `yaml:"api_cache_enable"`
+	CacheConfig               CacheConfig      `yaml:"cache_config"`
+	RpcServer                 ServerConfig     `yaml:"rpc_server"`
+	MetricsServer             ServerConfig     `yaml:"metrics_server"`
+	HttpServer                ServerConfig     `yaml:"http_server"`
+	WebsocketServer           ServerConfig     `yaml:"websocket_server"`
+	EmailConfig               EmailConfig      `yaml:"email_config"`
+	SMSConfig                 SMSConfig        `yaml:"sms_config"`
+	MinioConfig               MinioConfig      `yaml:"minio_config"`
+	KodoConfig                KodoConfig       `yaml:"kodo_config"`
+	S3Config                  S3Config         `yaml:"s3_config"`
+	CORSAllowedOrigins        string           `yaml:"cors_allowed_origins"`
+	JWTSecret                 string           `yaml:"jwt_secret"`
+	Domain                    string           `yaml:"domain"`
+	PrivateKey                string           `yaml:"private_key"`
+	NumConfirmations          uint64           `yaml:"num_confirmations"`
+	SafeAbortNonceTooLowCount uint64           `yaml:"safe_abort_nonce_too_low_count"`
+	CallerAddress             string           `yaml:"caller_address"`
+	RedisConfig               RedisConfig      `yaml:"redis_config"`
+	AggregatorConfig          AggregatorConfig `yaml:"aggregator_config"`
 }
 
 type DBConfig struct {
@@ -104,6 +101,26 @@ type S3Config struct {
 	Endpoint     string `yaml:"endpoint"`
 	CDNDomain    string `yaml:"cdn_domain"`
 	UsePathStyle bool   `yaml:"use_path_style"`
+}
+
+type RedisConfig struct {
+	Addr     string `yaml:"addr"`     // Redis server address (host:port)
+	Password string `yaml:"password"` // Redis password (optional)
+	DB       int    `yaml:"db"`       // Redis database number
+}
+
+type AggregatorConfig struct {
+	WalletAccountAddr          string            `yaml:"wallet_account_addr"`           // wallet-chain-account gRPC address
+	WalletAccountConsumerToken string            `yaml:"wallet_account_consumer_token"` // default consumer token for wallet-chain-account
+	ChainConsumerTokens        map[string]string `yaml:"chain_consumer_tokens"`         // optional per-chain tokens keyed by chain_id
+	ZeroXAPIURL                string            `yaml:"zerox_api_url"`                 // 0x Protocol API URL
+	ZeroXAPIKey                string            `yaml:"zerox_api_key"`                 // 0x Protocol API Key
+	OneInchAPIURL              string            `yaml:"oneinch_api_url"`               // 1inch API URL
+	OneInchAPIKey              string            `yaml:"oneinch_api_key"`               // 1inch API Key
+	JupiterAPIURL              string            `yaml:"jupiter_api_url"`               // Jupiter API URL
+	LiFiAPIURL                 string            `yaml:"lifi_api_url"`                  // LiFi API URL
+	LiFiAPIKey                 string            `yaml:"lifi_api_key"`                  // LiFi API Key
+	EnableProviders            map[string]bool   `yaml:"enable_providers"`              // Enable/disable specific providers
 }
 
 func New(path string) (*Config, error) {

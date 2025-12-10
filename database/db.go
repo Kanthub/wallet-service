@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"path/filepath"
+
 	"github.com/pkg/errors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"path/filepath"
 
 	"github.com/roothash-pay/wallet-services/common/retry"
 	"github.com/roothash-pay/wallet-services/config"
@@ -16,12 +17,27 @@ import (
 )
 
 type DB struct {
-	gorm            *gorm.DB
-	BackendAdmin    backend.AdminDB
-	BackendAuth     backend.AuthDB
-	BackendRole     backend.RoleDB
-	BackendRoleAuth backend.RoleAuthDB
-	BackendSysLog   backend.SysLogDB
+	gorm                     *gorm.DB
+	BackendAdmin             backend.AdminDB
+	BackendAuth              backend.AuthDB
+	BackendRole              backend.RoleDB
+	BackendRoleAuth          backend.RoleAuthDB
+	BackendSysLog            backend.SysLogDB
+	BackendAddressAsset      backend.AddressAssetDB
+	BackendAssetAmountStat   backend.AssetAmountStatDB
+	BackendChain             backend.ChainDB
+	BackendChainToken        backend.ChainTokenDB
+	BackendFiatCurrencyRate  backend.FiatCurrencyRateDB
+	BackendKline             backend.KlineDB
+	BackendMarketPrice       backend.MarketPriceDB
+	BackendNewsletter        backend.NewsletterDB
+	BackendNewsletterCat     backend.NewsletterCatDB
+	BackendToken             backend.TokenDB
+	BackendWallet            backend.WalletDB
+	BackendWalletAddress     backend.WalletAddressDB
+	BackendWalletAddressNote backend.WalletAddressNoteDB
+	BackendWalletAsset       backend.WalletAssetDB
+	BackendWalletTxRecord    backend.WalletTxRecordDB
 }
 
 func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
@@ -54,12 +70,27 @@ func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
 	}
 
 	db := &DB{
-		gorm:            gorms,
-		BackendAdmin:    backend.NewAdminDB(gorms),
-		BackendAuth:     backend.NewAuthDB(gorms),
-		BackendRole:     backend.NewRoleDB(gorms),
-		BackendRoleAuth: backend.NewRoleAuthDB(gorms),
-		BackendSysLog:   backend.NewSysLogDB(gorms),
+		gorm:                     gorms,
+		BackendAdmin:             backend.NewAdminDB(gorms),
+		BackendAuth:              backend.NewAuthDB(gorms),
+		BackendRole:              backend.NewRoleDB(gorms),
+		BackendRoleAuth:          backend.NewRoleAuthDB(gorms),
+		BackendSysLog:            backend.NewSysLogDB(gorms),
+		BackendAddressAsset:      backend.NewAddressAssetDB(gorms),
+		BackendAssetAmountStat:   backend.NewAssetAmountStatDB(gorms),
+		BackendChain:             backend.NewChainDB(gorms),
+		BackendChainToken:        backend.NewChainTokenDB(gorms),
+		BackendFiatCurrencyRate:  backend.NewFiatCurrencyRateDB(gorms),
+		BackendKline:             backend.NewKlineDB(gorms),
+		BackendMarketPrice:       backend.NewMarketPriceDB(gorms),
+		BackendNewsletter:        backend.NewNewsletterDB(gorms),
+		BackendNewsletterCat:     backend.NewNewsletterCatDB(gorms),
+		BackendToken:             backend.NewTokenDB(gorms),
+		BackendWallet:            backend.NewWalletDB(gorms),
+		BackendWalletAddress:     backend.NewWalletAddressDB(gorms),
+		BackendWalletAddressNote: backend.NewWalletAddressNoteDB(gorms),
+		BackendWalletAsset:       backend.NewWalletAssetDB(gorms),
+		BackendWalletTxRecord:    backend.NewWalletTxRecordDB(gorms),
 	}
 	return db, nil
 }
@@ -67,12 +98,27 @@ func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
 func (db *DB) Transaction(fn func(db *DB) error) error {
 	return db.gorm.Transaction(func(tx *gorm.DB) error {
 		txDB := &DB{
-			gorm:            tx,
-			BackendAdmin:    backend.NewAdminDB(tx),
-			BackendAuth:     backend.NewAuthDB(tx),
-			BackendRole:     backend.NewRoleDB(tx),
-			BackendRoleAuth: backend.NewRoleAuthDB(tx),
-			BackendSysLog:   backend.NewSysLogDB(tx),
+			gorm:                     tx,
+			BackendAdmin:             backend.NewAdminDB(tx),
+			BackendAuth:              backend.NewAuthDB(tx),
+			BackendRole:              backend.NewRoleDB(tx),
+			BackendRoleAuth:          backend.NewRoleAuthDB(tx),
+			BackendSysLog:            backend.NewSysLogDB(tx),
+			BackendAddressAsset:      backend.NewAddressAssetDB(tx),
+			BackendAssetAmountStat:   backend.NewAssetAmountStatDB(tx),
+			BackendChain:             backend.NewChainDB(tx),
+			BackendChainToken:        backend.NewChainTokenDB(tx),
+			BackendFiatCurrencyRate:  backend.NewFiatCurrencyRateDB(tx),
+			BackendKline:             backend.NewKlineDB(tx),
+			BackendMarketPrice:       backend.NewMarketPriceDB(tx),
+			BackendNewsletter:        backend.NewNewsletterDB(tx),
+			BackendNewsletterCat:     backend.NewNewsletterCatDB(tx),
+			BackendToken:             backend.NewTokenDB(tx),
+			BackendWallet:            backend.NewWalletDB(tx),
+			BackendWalletAddress:     backend.NewWalletAddressDB(tx),
+			BackendWalletAddressNote: backend.NewWalletAddressNoteDB(tx),
+			BackendWalletAsset:       backend.NewWalletAssetDB(tx),
+			BackendWalletTxRecord:    backend.NewWalletTxRecordDB(tx),
 		}
 		return fn(txDB)
 	})

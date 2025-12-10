@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
-	"github.com/pkg/errors"
-	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/log"
 
@@ -37,7 +37,7 @@ func (h *HandlerSvc) AdminUserLogin(req backend.AdminLoginRequest) (*backend.Adm
 		}, nil
 	}
 
-	token, err := h.siweVerifier.GenerateJWT(strconv.FormatInt(user.ID, 10), 24) // 24小时有效期
+	token, err := h.siweVerifier.GenerateJWT(user.Guid, 24) // 24小时有效期
 	if err != nil {
 		log.Error("Failed to generate JWT", "err", err)
 		return &backend.AdminLoginResponse{
@@ -59,7 +59,7 @@ func (h *HandlerSvc) AdminUserLogin(req backend.AdminLoginRequest) (*backend.Adm
 		Message: "login success",
 		Token:   token,
 		AdminInfo: &backend.AdminInfo{
-			ID:       uint64(user.ID),
+			Guid:     user.Guid,
 			Username: user.RealName,
 		},
 	}, nil
