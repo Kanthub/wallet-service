@@ -15,7 +15,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" cascade;
 create table if not exists sys_log (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     action        VARCHAR(100) DEFAULT '', -- 路径 --
-    desc          VARCHAR(100) DEFAULT '', -- 描述 --
+    remark          VARCHAR(100) DEFAULT '', -- 描述 --
     admin         VARCHAR(30)  DEFAULT '', -- 操作管理员 --
     ip            VARCHAR(30)  DEFAULT '', -- 操作管理员 IP --
     cate          SMALLINT DEFAULT 0,      -- 类型(0表示其他;1=>表示登陆;2=>表示财务操作) --
@@ -100,17 +100,27 @@ CREATE INDEX idx_admin_last_login ON admin (last_login);
 
 CREATE TABLE if not exists chain (
     guid               TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
+    chain_id           VARCHAR(64) NOT NULL UNIQUE,
     chain_name         VARCHAR(70) NOT NULL,
     chain_mark         VARCHAR(70) NOT NULL,
     chain_logo         VARCHAR(200) NOT NULL,
     chain_active_logo  VARCHAR(200) NOT NULL,
     chain_model_type   VARCHAR(10) NOT NULL,  --utxo/account--
+    chain_type         VARCHAR(32) DEFAULT '',
+    network            VARCHAR(64) DEFAULT '',
+    native_symbol      VARCHAR(32) DEFAULT '',
+    explorer_url       VARCHAR(255) DEFAULT '',
+    wallet_chain       VARCHAR(64) DEFAULT '',  -- wallet-chain-account 服务 Chain 参数 --
+    wallet_network     VARCHAR(64) DEFAULT '',  -- wallet-chain-account 服务 Network 参数 --
+    wallet_coin        VARCHAR(32) DEFAULT '',  -- wallet-chain-account 服务 Coin 参数 --
+    rpc_url            VARCHAR(255) DEFAULT '', -- 调用 wallet-chain-account CallContract/SendTx 的 RPC 入口 --
+    is_enabled         BOOLEAN DEFAULT TRUE,
     created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_chain_guid ON chain (guid);
 CREATE INDEX idx_chain_name_guid ON chain (chain_name);
-
+CREATE INDEX idx_chain_chain_id ON chain (chain_id);
 
 CREATE TABLE if not exists token (
     guid                    TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
@@ -121,29 +131,29 @@ CREATE TABLE if not exists token (
     token_decimal           VARCHAR(10) DEFAULT '18',
     token_symbol            VARCHAR(70) DEFAULT '',
     token_contract_address  VARCHAR(70) NOT NULL,
-    token_chain_uuid        VARCHAR(255) DEFAULT '',
+    token_chain_id          VARCHAR(255) DEFAULT '',
     is_hot                  VARCHAR(32) NOT NULL DEFAULT 'hot',
     created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_token_guid ON chain (guid);
-CREATE INDEX idx_token_token_name ON chain (token_name);
+CREATE INDEX idx_token_guid ON token (guid);
+CREATE INDEX idx_token_token_name ON token (token_name);
 
 CREATE TABLE if not exists chain_token (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    chain_uuid    VARCHAR(255) DEFAULT '',
-    token_uuid    VARCHAR(255) NOT NULL,
+    chain_id      VARCHAR(255) DEFAULT '',
+    token_id      VARCHAR(255) NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
+);
 CREATE INDEX idx_chain_token_guid ON chain_token (guid);
-CREATE INDEX idx_chain_token_chain_uuid ON chain_token (chain_uuid);
+CREATE INDEX idx_chain_token_chain_id ON chain_token (chain_id);
 
 CREATE TABLE if not exists wallet (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     device_uuid   VARCHAR(255) NOT NULL,
     wallet_uuid   VARCHAR(255) NOT NULL,
-    chain_uuid    VARCHAR(255) DEFAULT '',
+    chain_id      VARCHAR(255) DEFAULT '',
     wallet_name   VARCHAR(70) DEFAULT 'roothash',
     asset_usdt    NUMERIC(20, 8) NOT NULL,
     asset_usd     NUMERIC(20, 8) NOT NULL,
@@ -157,31 +167,36 @@ CREATE TABLE if not exists wallet_address (
     guid             TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     address_index    INTEGER CHECK (address_index > 0),
     address          VARCHAR(70) NOT NULL,
-    wallet_uuid      VARCHAR(255) DEFAULT ''
+    wallet_uuid      VARCHAR(255) DEFAULT '',
+    chain_id         VARCHAR(255) DEFAULT '',
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_wallet_address_guid ON wallet_address (guid);
 CREATE INDEX idx_wallet_address_wallet_uuid ON wallet_address (wallet_uuid);
+CREATE INDEX idx_wallet_address_address ON wallet_address (address);
+CREATE INDEX idx_wallet_address_chain_id ON wallet_address (chain_id);
 
 CREATE TABLE if not exists wallet_asset (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    token_uuid    VARCHAR(255) DEFAULT '',
-    chain_uuid    VARCHAR(255) DEFAULT '',
-    balance       INTEGER CHECK (balance > 0),
+    wallet_uuid   VARCHAR(255) NOT NULL,
+    token_id      VARCHAR(255) DEFAULT '',
+    chain_id      VARCHAR(255) DEFAULT '',
+    balance       NUMERIC(78,0) NOT NULL CHECK (balance >= 0),  -- 使用 NUMERIC(78,0) 支持 uint256 范围
     asset_usdt    NUMERIC(20, 8) NOT NULL,
     asset_usd     NUMERIC(20, 8) NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_wallet_asset_guid ON wallet_asset (guid);
-CREATE INDEX idx_wallet_asset_chain_uuid ON wallet_address (chain_uuid);
+CREATE INDEX idx_wallet_asset_wallet_uuid ON wallet_asset (wallet_uuid);
+CREATE INDEX idx_wallet_asset_chain_id ON wallet_asset (chain_id);
 
 CREATE TABLE if not exists asset_amount_stat (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     asset_uuid    VARCHAR(255) DEFAULT '',
     time_date     VARCHAR(255) NOT NULL,
-    amount        INTEGER CHECK (amount > 0),
+    amount        NUMERIC(78,0) NOT NULL CHECK (amount >= 0),  -- 使用 NUMERIC(78,0) 支持 uint256 范围
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -191,12 +206,12 @@ CREATE INDEX idx_asset_amount_stat_asset_uuid ON asset_amount_stat (asset_uuid);
 
 CREATE TABLE if not exists address_asset (
     guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    token_uuid    VARCHAR(255) DEFAULT '',
+    token_id      VARCHAR(255) DEFAULT '',
     wallet_uuid   VARCHAR(255) DEFAULT '',
     address_uuid  VARCHAR(255) DEFAULT '',
     asset_usdt    NUMERIC(20, 8) NOT NULL,
     asset_usd     NUMERIC(20, 8) NOT NULL,
-    balance       INTEGER CHECK (balance > 0),
+    balance       NUMERIC(78,0) NOT NULL CHECK (balance >= 0),  -- 使用 NUMERIC(78,0) 支持 uint256 范围
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -205,29 +220,45 @@ CREATE INDEX idx_address_asset_address_uuid ON address_asset (address_uuid);
 
 
 CREATE TABLE if not exists wallet_tx_record (
-    guid          TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    tx_time       VARCHAR(500) NOT NULL,
-    chain_uuid    VARCHAR(255) DEFAULT '',
-    token_uuid    VARCHAR(255) DEFAULT '',
-    from_address  VARCHAR(70) NOT NULL,
-    to_address    VARCHAR(70) NOT NULL,
-    amount        INTEGER CHECK (amount > 0),
-    memo          VARCHAR(500) NOT NULL,
-    hash          VARCHAR(500) NOT NULL,
-    block_height  VARCHAR(500) NOT NULL,
-    explorer_url  VARCHAR(500) NOT NULL,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    guid             TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
+    operation_id     VARCHAR(255) DEFAULT '' NOT NULL,  -- 关联到完整操作（如 SwapID），用于查询某个操作的所有步骤
+    step_index       INTEGER DEFAULT 0 NOT NULL,        -- 步骤索引（0, 1, 2...），表示在操作中的执行顺序
+    wallet_uuid      VARCHAR(255) NOT NULL,
+    address_uuid     VARCHAR(255) DEFAULT '',
+    tx_time          VARCHAR(500) NOT NULL,
+    chain_id         VARCHAR(255) DEFAULT '',
+    token_id         VARCHAR(255) DEFAULT '',
+    from_address     VARCHAR(70) NOT NULL,
+    to_address       VARCHAR(70) NOT NULL,
+    amount           NUMERIC(78,0) NOT NULL CHECK (amount >= 0),
+    memo             VARCHAR(500) NOT NULL,
+    hash             VARCHAR(500) DEFAULT '',
+    block_height     VARCHAR(500) DEFAULT '',
+    tx_type          VARCHAR(50) DEFAULT 'transfer',    -- 交易类型：approve, swap, bridge, wrap, unwrap, transfer
+    status           INTEGER DEFAULT 0,                 -- 交易状态：0=CREATED, 1=PENDING, 2=FAILED, 3=SUCCESS
+    fail_reason_code VARCHAR(100) DEFAULT '',
+    fail_reason_msg  VARCHAR(500) DEFAULT '',
+    last_checked_at  TIMESTAMP,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_wallet_tx_record_guid ON wallet_tx_record (guid);
+CREATE INDEX idx_wallet_tx_record_operation_step ON wallet_tx_record (operation_id, step_index);  -- 复合索引：用于查询操作的所有步骤
+CREATE INDEX idx_wallet_tx_record_wallet_uuid ON wallet_tx_record (wallet_uuid);
+CREATE INDEX idx_wallet_tx_record_chain_id ON wallet_tx_record (chain_id);
+CREATE INDEX idx_wallet_tx_record_token_id ON wallet_tx_record (token_id);
 CREATE INDEX idx_wallet_tx_record_from_address ON wallet_tx_record (from_address);
 CREATE INDEX idx_wallet_tx_record_to_address ON wallet_tx_record (to_address);
+CREATE INDEX idx_wallet_tx_record_tx_type ON wallet_tx_record (tx_type);
+CREATE INDEX idx_wallet_tx_record_status_last_checked ON wallet_tx_record (status, last_checked_at);
+CREATE INDEX idx_wallet_tx_record_hash ON wallet_tx_record (hash);
+ALTER TABLE wallet_tx_record DROP COLUMN IF EXISTS explorer_url;
 
 
 CREATE TABLE if not exists wallet_address_note (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
     device_uuid  VARCHAR(255) NOT NULL,
-    chain_uuid   VARCHAR(255) DEFAULT '',
+    chain_id     VARCHAR(255) DEFAULT '',
     memo         VARCHAR(255) NOT NULL,
     address      VARCHAR(255) NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -243,27 +274,27 @@ CREATE TABLE if not exists fiat_currency_rate (
     value_data   VARCHAR(255) NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
+);
 CREATE INDEX idx_fiat_currency_rate_guid ON fiat_currency_rate (guid);
 CREATE INDEX idx_fiat_currency_rate_key_name ON fiat_currency_rate (key_name);
 
 
 CREATE TABLE if not exists market_price (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    chain_uuid   VARCHAR(255) DEFAULT '',
-    token_uuid   VARCHAR(255) DEFAULT '',
+    chain_id     VARCHAR(255) DEFAULT '',
+    token_id     VARCHAR(255) DEFAULT '',
     usdt_price   NUMERIC(20, 8) NOT NULL,
     usd_price    NUMERIC(20, 8) NOT NULL,
-    market_cap   INTEGER CHECK (market_cap > 0),
-    liquidity    INTEGER CHECK (liquidity > 0),
-    24h_volume   INTEGER CHECK (liquidity > 0),
+    market_cap   NUMERIC(20, 2) CHECK (market_cap >= 0),      -- 市值（美元）
+    liquidity    NUMERIC(20, 2) CHECK (liquidity >= 0),       -- 流动性（美元）
+    24h_volume   NUMERIC(20, 2) CHECK (24h_volume >= 0),      -- 24小时成交量（美元）
     price_change VARCHAR(255) NOT NULL,
     ranking      VARCHAR(255) NOT NULL,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
+);
 CREATE INDEX idx_market_price_guid ON market_price (guid);
-CREATE INDEX idx_market_price_token_uuid ON market_price (key_name);
+CREATE INDEX idx_market_price_token_id ON market_price (token_id);
 
 
 CREATE TABLE IF NOT EXISTS kline (
@@ -282,7 +313,7 @@ CREATE TABLE IF NOT EXISTS kline (
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_kline_interval_time ON kline(token_id, time_interval, open_time);
-CREATE INDEX IF NOT EXISTS idx_kline_time ON kline(symbol_id, open_time DESC);
+CREATE INDEX IF NOT EXISTS idx_kline_time ON kline(token_id, open_time DESC);
 
 CREATE TABLE IF NOT EXISTS newsletter_cat (
     guid          VARCHAR PRIMARY KEY,

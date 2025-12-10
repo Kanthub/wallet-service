@@ -10,11 +10,21 @@ import (
 
 type Chain struct {
 	Guid            string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
+	ChainID         string    `gorm:"column:chain_id;type:varchar(64);uniqueIndex;not null" json:"chain_id"`
 	ChainName       string    `gorm:"column:chain_name;type:varchar(70);not null" json:"chain_name"`
 	ChainMark       string    `gorm:"column:chain_mark;type:varchar(70);not null" json:"chain_mark"`
 	ChainLogo       string    `gorm:"column:chain_logo;type:varchar(200);not null" json:"chain_logo"`
 	ChainActiveLogo string    `gorm:"column:chain_active_logo;type:varchar(200);not null" json:"chain_active_logo"`
 	ChainModelType  string    `gorm:"column:chain_model_type;type:varchar(10);not null" json:"chain_model_type"`
+	ChainType       string    `gorm:"column:chain_type;type:varchar(32);default:''" json:"chain_type"`
+	Network         string    `gorm:"column:network;type:varchar(64);default:''" json:"network"`
+	NativeSymbol    string    `gorm:"column:native_symbol;type:varchar(32);default:''" json:"native_symbol"`
+	ExplorerURL     string    `gorm:"column:explorer_url;type:varchar(255);default:''" json:"explorer_url"`
+	WalletChain     string    `gorm:"column:wallet_chain;type:varchar(64);default:''" json:"wallet_chain"`
+	WalletNetwork   string    `gorm:"column:wallet_network;type:varchar(64);default:''" json:"wallet_network"`
+	WalletCoin      string    `gorm:"column:wallet_coin;type:varchar(32);default:''" json:"wallet_coin"`
+	RpcURL          string    `gorm:"column:rpc_url;type:varchar(255);default:''" json:"rpc_url"`
+	IsEnabled       bool      `gorm:"column:is_enabled;type:boolean;default:true" json:"is_enabled"`
 	CreateTime      time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
 	UpdateTime      time.Time `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
 }
@@ -25,8 +35,10 @@ func (Chain) TableName() string {
 
 type ChainView interface {
 	GetByGuid(guid string) (*Chain, error)
+	GetByChainID(chainID string) (*Chain, error)
 	GetByName(name string) (*Chain, error)
 	GetChainList(page, pageSize int, filters map[string]interface{}) ([]*Chain, int64, error)
+	ListAllChains() ([]*Chain, error)
 }
 
 type ChainDB interface {
@@ -65,6 +77,15 @@ func (db *chainDB) GetByGuid(guid string) (*Chain, error) {
 	var c Chain
 	if err := db.gorm.Where("guid = ?", guid).First(&c).Error; err != nil {
 		log.Error("GetByGuid chain error", "err", err)
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (db *chainDB) GetByChainID(chainID string) (*Chain, error) {
+	var c Chain
+	if err := db.gorm.Where("chain_id = ?", chainID).First(&c).Error; err != nil {
+		log.Error("GetByChainID chain error", "chainID", chainID, "err", err)
 		return nil, err
 	}
 	return &c, nil
@@ -115,6 +136,15 @@ func (db *chainDB) GetChainList(page, pageSize int, filters map[string]interface
 	}
 
 	return list, total, nil
+}
+
+func (db *chainDB) ListAllChains() ([]*Chain, error) {
+	var list []*Chain
+	if err := db.gorm.Order("created_at DESC").Find(&list).Error; err != nil {
+		log.Error("ListAllChains error", "err", err)
+		return nil, err
+	}
+	return list, nil
 }
 
 func (db *chainDB) UpdateChain(guid string, updates map[string]interface{}) error {

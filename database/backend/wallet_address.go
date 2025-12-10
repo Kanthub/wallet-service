@@ -12,8 +12,9 @@ import (
 type WalletAddress struct {
 	Guid         string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
 	AddressIndex int64     `gorm:"column:address_index;type:integer;check:address_index > 0" json:"address_index"`
-	Address      string    `gorm:"column:address;type:varchar(70);not null" json:"address"`
-	WalletUUID   string    `gorm:"column:wallet_uuid;type:varchar(255);default:''" json:"wallet_uuid"`
+	Address      string    `gorm:"column:address;type:varchar(70);not null;index" json:"address"`
+	WalletUUID   string    `gorm:"column:wallet_uuid;type:varchar(255);default:'';index" json:"wallet_uuid"`
+	ChainID      string    `gorm:"column:chain_id;type:varchar(255);default:'';index" json:"chain_id"`
 	CreateTime   time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
 	UpdateTime   time.Time `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
 }

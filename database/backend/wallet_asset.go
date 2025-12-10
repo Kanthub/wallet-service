@@ -11,9 +11,10 @@ import (
 
 type WalletAsset struct {
 	Guid       string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
-	TokenUUID  string    `gorm:"column:token_uuid;type:varchar(255);default:''" json:"token_uuid"`
-	ChainUUID  string    `gorm:"column:chain_uuid;type:varchar(255);default:''" json:"chain_uuid"`
-	Balance    int64     `gorm:"column:balance;type:integer" json:"balance"`
+	WalletUUID string    `gorm:"column:wallet_uuid;type:varchar(255);not null;index" json:"wallet_uuid"`
+	TokenID    string    `gorm:"column:token_id;type:varchar(255);default:''" json:"token_id"`
+	ChainID    string    `gorm:"column:chain_id;type:varchar(255);default:'';index" json:"chain_id"`
+	Balance    string    `gorm:"column:balance;type:numeric(78,0);not null" json:"balance"` // 使用 string 存储大数字（支持 uint256）
 	AssetUsdt  string    `gorm:"column:asset_usdt;type:numeric(20,8);not null" json:"asset_usdt"`
 	AssetUsd   string    `gorm:"column:asset_usd;type:numeric(20,8);not null" json:"asset_usd"`
 	CreateTime time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
@@ -26,7 +27,7 @@ func (WalletAsset) TableName() string {
 
 type WalletAssetView interface {
 	GetByGuid(guid string) (*WalletAsset, error)
-	GetByTokenChain(tokenUUID, chainUUID string) (*WalletAsset, error)
+	GetByTokenChain(tokenID, chainID string) (*WalletAsset, error)
 }
 
 type WalletAssetDB interface {
@@ -70,9 +71,9 @@ func (db *walletAssetDB) GetByGuid(guid string) (*WalletAsset, error) {
 	return &a, nil
 }
 
-func (db *walletAssetDB) GetByTokenChain(tokenUUID, chainUUID string) (*WalletAsset, error) {
+func (db *walletAssetDB) GetByTokenChain(tokenID, chainID string) (*WalletAsset, error) {
 	var a WalletAsset
-	if err := db.gorm.Where("token_uuid = ? AND chain_uuid = ?", tokenUUID, chainUUID).First(&a).Error; err != nil {
+	if err := db.gorm.Where("token_id = ? AND chain_id = ?", tokenID, chainID).First(&a).Error; err != nil {
 		log.Error("GetByTokenChain WalletAsset error", "err", err)
 		return nil, err
 	}

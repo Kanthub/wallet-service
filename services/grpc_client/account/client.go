@@ -33,6 +33,20 @@ type SendTxResult struct {
 	TxHash string
 }
 
+type CallContractParams struct {
+	ConsumerToken   string
+	Chain           string
+	Network         string
+	ContractAddress string
+	Data            string
+}
+
+type CallContractResult struct {
+	Code   common.ReturnCode
+	Msg    string
+	Result string
+}
+
 func NewWalletAccountClient(addr string) (*WalletAccountClient, error) {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -70,6 +84,35 @@ func (c *WalletAccountClient) SendTx(ctx context.Context, params SendTxParams) (
 		Code:   resp.Code,
 		Msg:    resp.Msg,
 		TxHash: resp.TxHash,
+	}, nil
+}
+
+func (c *WalletAccountClient) CallContract(ctx context.Context, params CallContractParams) (*CallContractResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	req := &pb.CallContractRequest{
+		ConsumerToken:   params.ConsumerToken,
+		Chain:           params.Chain,
+		Network:         params.Network,
+		ContractAddress: params.ContractAddress,
+		Data:            params.Data,
+	}
+
+	resp, err := c.client.CallContract(ctx, req)
+	if err != nil {
+		log.Error("CallContract RPC failed", "err", err)
+		return nil, fmt.Errorf("failed to call contract: %w", err)
+	}
+
+	if resp.Code != common.ReturnCode_SUCCESS {
+		return nil, fmt.Errorf("call contract failed: %s", resp.Msg)
+	}
+
+	return &CallContractResult{
+		Code:   resp.Code,
+		Msg:    resp.Msg,
+		Result: resp.Result,
 	}, nil
 }
 

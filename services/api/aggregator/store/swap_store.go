@@ -18,6 +18,7 @@ type SwapStore interface {
 	UpdateStep(ctx context.Context, swapID string, stepIndex int, step *backend.Step) error
 	GetStep(ctx context.Context, swapID string, stepIndex int) (*backend.Step, error)
 	CheckIdempotency(ctx context.Context, swapID string, stepIndex int, idempotencyKey string) (string, bool)
+	RecordIdempotency(ctx context.Context, swapID string, stepIndex int, idempotencyKey string, txHash string) error
 }
 
 // InMemorySwapStore implements SwapStore using in-memory storage

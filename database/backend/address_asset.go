@@ -11,12 +11,12 @@ import (
 
 type AddressAsset struct {
 	Guid        string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
-	TokenUUID   string    `gorm:"column:token_uuid;type:varchar(255);default:''" json:"token_uuid"`
+	TokenID     string    `gorm:"column:token_id;type:varchar(255);default:''" json:"token_id"`
 	WalletUUID  string    `gorm:"column:wallet_uuid;type:varchar(255);default:''" json:"wallet_uuid"`
 	AddressUUID string    `gorm:"column:address_uuid;type:varchar(255);default:''" json:"address_uuid"`
 	AssetUsdt   string    `gorm:"column:asset_usdt;type:numeric(20,8);not null" json:"asset_usdt"`
 	AssetUsd    string    `gorm:"column:asset_usd;type:numeric(20,8);not null" json:"asset_usd"`
-	Balance     int64     `gorm:"column:balance;type:integer" json:"balance"`
+	Balance     string    `gorm:"column:balance;type:numeric(78,0);not null" json:"balance"` // 使用 string 存储大数字（支持 uint256）
 	CreateTime  time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
 	UpdateTime  time.Time `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
 }

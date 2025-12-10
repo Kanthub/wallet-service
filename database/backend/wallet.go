@@ -13,7 +13,7 @@ type Wallet struct {
 	Guid       string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
 	DeviceUUID string    `gorm:"column:device_uuid;type:varchar(255);not null" json:"device_uuid"`
 	WalletUUID string    `gorm:"column:wallet_uuid;type:varchar(255);not null" json:"wallet_uuid"`
-	ChainUUID  string    `gorm:"column:chain_uuid;type:varchar(255);default:''" json:"chain_uuid"`
+	ChainID    string    `gorm:"column:chain_id;type:varchar(255);default:''" json:"chain_id"`
 	WalletName string    `gorm:"column:wallet_name;type:varchar(70);default:'roothash'" json:"wallet_name"`
 	AssetUsdt  string    `gorm:"column:asset_usdt;type:numeric(20,8);not null" json:"asset_usdt"`
 	AssetUsd   string    `gorm:"column:asset_usd;type:numeric(20,8);not null" json:"asset_usd"`

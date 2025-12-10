@@ -147,6 +147,7 @@ wallet-services/
 - **[API 文档](./docs/api.md)** - 完整的 RESTful API 参考
 - **[架构文档](./docs/architecture.md)** - 系统架构和设计说明
 - **[部署文档](./docs/deployment.md)** - 部署和运维指南
+- **[闪兑历史持久化](./docs/swap_history.md)** - 交易历史保存机制
 
 ---
 

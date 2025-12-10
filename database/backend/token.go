@@ -2,6 +2,7 @@ package backend
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -17,7 +18,7 @@ type Token struct {
 	TokenDecimal         string    `gorm:"column:token_decimal;type:varchar(10);default:'18'" json:"token_decimal"`
 	TokenSymbol          string    `gorm:"column:token_symbol;type:varchar(70);default:''" json:"token_symbol"`
 	TokenContractAddress string    `gorm:"column:token_contract_address;type:varchar(70);not null" json:"token_contract_address"`
-	TokenChainUUID       string    `gorm:"column:token_chain_uuid;type:varchar(255);default:''" json:"token_chain_uuid"`
+	ChainID              string    `gorm:"column:token_chain_id;type:varchar(255);default:''" json:"chain_id"`
 	IsHot                string    `gorm:"column:is_hot;type:varchar(32);not null;default:'hot'" json:"is_hot"`
 	CreateTime           time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
 	UpdateTime           time.Time `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
@@ -30,6 +31,7 @@ func (Token) TableName() string {
 type TokenView interface {
 	GetByGuid(guid string) (*Token, error)
 	GetByContractAddress(addr string) (*Token, error)
+	GetByContractAndChain(addr, chainID string) (*Token, error)
 	GetTokenList(page, pageSize int, filters map[string]interface{}) ([]*Token, int64, error)
 }
 
@@ -78,6 +80,26 @@ func (db *tokenDB) GetByContractAddress(addr string) (*Token, error) {
 	var t Token
 	if err := db.gorm.Where("token_contract_address = ?", addr).First(&t).Error; err != nil {
 		log.Error("GetByContractAddress error", "err", err)
+		return nil, err
+	}
+	return &t, nil
+}
+
+func (db *tokenDB) GetByContractAndChain(addr, chainID string) (*Token, error) {
+	if addr == "" {
+		return nil, fmt.Errorf("contract address is required")
+	}
+
+	normalized := strings.ToLower(addr)
+
+	query := db.gorm.Where("LOWER(token_contract_address) = ?", normalized)
+	if chainID != "" {
+		query = query.Where("token_chain_id = ?", chainID)
+	}
+
+	var t Token
+	if err := query.First(&t).Error; err != nil {
+		log.Error("GetByContractAndChain token error", "addr", normalized, "chain_id", chainID, "err", err)
 		return nil, err
 	}
 	return &t, nil

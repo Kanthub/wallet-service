@@ -17,6 +17,9 @@ jwt_secret: "your-dev-secret-key"
 # 闪兑聚合器
 aggregator_config:
   wallet_account_addr: "127.0.0.1:8189"
+  wallet_account_consumer_token: ""
+  chain_consumer_tokens:
+    "1": ""
   
   # 0x Protocol
   zerox_api_url: "https://api.0x.org"
@@ -32,7 +35,7 @@ aggregator_config:
   # LiFi
   lifi_api_url: "https://li.quest/v1"
   lifi_api_key: ""
-  
+
   enable_providers:
     0x: false
     1inch: false

@@ -32,12 +32,8 @@ type Config struct {
 	NumConfirmations          uint64           `yaml:"num_confirmations"`
 	SafeAbortNonceTooLowCount uint64           `yaml:"safe_abort_nonce_too_low_count"`
 	CallerAddress             string           `yaml:"caller_address"`
+	RedisConfig               RedisConfig      `yaml:"redis_config"`
 	AggregatorConfig          AggregatorConfig `yaml:"aggregator_config"`
-}
-
-type WalletChainConfig struct {
-	RpcUrl        string `yaml:"rpc_url"`
-	ConsumerToken string `yaml:"consumer_token"`
 }
 
 type DBConfig struct {
@@ -107,16 +103,24 @@ type S3Config struct {
 	UsePathStyle bool   `yaml:"use_path_style"`
 }
 
+type RedisConfig struct {
+	Addr     string `yaml:"addr"`     // Redis server address (host:port)
+	Password string `yaml:"password"` // Redis password (optional)
+	DB       int    `yaml:"db"`       // Redis database number
+}
+
 type AggregatorConfig struct {
-	WalletAccountAddr string          `yaml:"wallet_account_addr"` // wallet-chain-account gRPC address
-	ZeroXAPIURL       string          `yaml:"zerox_api_url"`       // 0x Protocol API URL
-	ZeroXAPIKey       string          `yaml:"zerox_api_key"`       // 0x Protocol API Key
-	OneInchAPIURL     string          `yaml:"oneinch_api_url"`     // 1inch API URL
-	OneInchAPIKey     string          `yaml:"oneinch_api_key"`     // 1inch API Key
-	JupiterAPIURL     string          `yaml:"jupiter_api_url"`     // Jupiter API URL
-	LiFiAPIURL        string          `yaml:"lifi_api_url"`        // LiFi API URL
-	LiFiAPIKey        string          `yaml:"lifi_api_key"`        // LiFi API Key
-	EnableProviders   map[string]bool `yaml:"enable_providers"`    // Enable/disable specific providers
+	WalletAccountAddr          string            `yaml:"wallet_account_addr"`           // wallet-chain-account gRPC address
+	WalletAccountConsumerToken string            `yaml:"wallet_account_consumer_token"` // default consumer token for wallet-chain-account
+	ChainConsumerTokens        map[string]string `yaml:"chain_consumer_tokens"`         // optional per-chain tokens keyed by chain_id
+	ZeroXAPIURL                string            `yaml:"zerox_api_url"`                 // 0x Protocol API URL
+	ZeroXAPIKey                string            `yaml:"zerox_api_key"`                 // 0x Protocol API Key
+	OneInchAPIURL              string            `yaml:"oneinch_api_url"`               // 1inch API URL
+	OneInchAPIKey              string            `yaml:"oneinch_api_key"`               // 1inch API Key
+	JupiterAPIURL              string            `yaml:"jupiter_api_url"`               // Jupiter API URL
+	LiFiAPIURL                 string            `yaml:"lifi_api_url"`                  // LiFi API URL
+	LiFiAPIKey                 string            `yaml:"lifi_api_key"`                  // LiFi API Key
+	EnableProviders            map[string]bool   `yaml:"enable_providers"`              // Enable/disable specific providers
 }
 
 func New(path string) (*Config, error) {

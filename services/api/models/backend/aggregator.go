@@ -16,29 +16,29 @@ const (
 type ActionType string
 
 const (
-	ActionTypeApprove ActionType = "APPROVE"
-	ActionTypeSwap    ActionType = "SWAP"
+	ActionTypeApprove ActionType = "APPROVE" // 授权操作
+	ActionTypeSwap    ActionType = "SWAP"    // 交换操作
+	ActionTypeBridge  ActionType = "BRIDGE"  // 跨链桥接
+	ActionTypeWrap    ActionType = "WRAP"    // 包装原生代币
+	ActionTypeUnwrap  ActionType = "UNWRAP"  // 解包装代币
 )
 
-// SwapState represents the state of a swap
-type SwapState string
-
+// TxStatus represents the status of a transaction (unified with database)
+// 使用与 database/backend/wallet_tx_record.go 相同的状态定义
 const (
-	SwapStatePending   SwapState = "PENDING"
-	SwapStateSubmitted SwapState = "SUBMITTED"
-	SwapStateConfirmed SwapState = "CONFIRMED"
-	SwapStateFailed    SwapState = "FAILED"
+	TxStatusCreated = 0 // CREATED: 后端收到 signedTx 请求并写入记录，但尚未广播
+	TxStatusPending = 1 // PENDING: 广播成功并拿到 txHash
+	TxStatusFailed  = 2 // FAILED: 广播失败或链上执行失败或超时
+	TxStatusSuccess = 3 // SUCCESS: 链上确认成功
 )
 
-// StepState represents the state of a transaction step
-type StepState string
-
-const (
-	StepStatePending   StepState = "PENDING"
-	StepStateSubmitted StepState = "SUBMITTED"
-	StepStateConfirmed StepState = "CONFIRMED"
-	StepStateFailed    StepState = "FAILED"
-)
+// TxStatusNames provides human-readable names for status codes
+var TxStatusNames = map[int]string{
+	TxStatusCreated: "CREATED",
+	TxStatusPending: "PENDING",
+	TxStatusFailed:  "FAILED",
+	TxStatusSuccess: "SUCCESS",
+}
 
 // QuoteRequest represents a request for swap quotes
 type QuoteRequest struct {
@@ -49,6 +49,7 @@ type QuoteRequest struct {
 	Amount      string `json:"amount" validate:"required"`
 	SlippageBps int    `json:"slippage_bps" validate:"required,min=0,max=10000"`
 	UserAddress string `json:"user_address,omitempty"`
+	WalletUUID  string `json:"wallet_uuid,omitempty"` // Optional: wallet UUID for tracking
 }
 
 // Quote represents a swap quote from a provider
@@ -79,6 +80,7 @@ type QuoteResponse struct {
 type PrepareSwapRequest struct {
 	QuoteID     string `json:"quote_id" validate:"required"`
 	UserAddress string `json:"user_address" validate:"required"`
+	WalletUUID  string `json:"wallet_uuid,omitempty"` // Optional: wallet UUID for tracking
 }
 
 // SigningPayload represents the data to be signed
@@ -114,6 +116,11 @@ type PrepareSwapResponse struct {
 	Actions []*Action `json:"actions"`
 }
 
+// BuildSwapResponse represents the response from provider build swap
+type BuildSwapResponse struct {
+	Actions []*Action `json:"actions"`
+}
+
 // SubmitSignedTxRequest represents a request to submit a signed transaction
 type SubmitSignedTxRequest struct {
 	SwapID         string `json:"swap_id" validate:"required"`
@@ -132,7 +139,7 @@ type Step struct {
 	StepIndex      int        `json:"step_index"`
 	ActionType     ActionType `json:"action_type"`
 	TxHash         string     `json:"tx_hash,omitempty"`
-	State          StepState  `json:"state"`
+	Status         int        `json:"status"` // 0=CREATED, 1=PENDING, 2=FAILED, 3=SUCCESS
 	SubmittedAt    *time.Time `json:"submitted_at,omitempty"`
 	ConfirmedAt    *time.Time `json:"confirmed_at,omitempty"`
 	FailReasonCode string     `json:"fail_reason_code,omitempty"`
@@ -143,9 +150,10 @@ type Step struct {
 // Swap represents a complete swap operation
 type Swap struct {
 	SwapID         string    `json:"swap_id"`
-	QuoteID        string    `json:"quote_id"`
+	QuoteID        string    `json:"quote_id"` // 待修改
 	UserAddress    string    `json:"user_address"`
-	State          SwapState `json:"state"`
+	WalletUUID     string    `json:"wallet_uuid,omitempty"` // Wallet UUID for tracking
+	Status         int       `json:"status"`                // 整体状态（根据所有 steps 计算）: 0=CREATED, 1=PENDING, 2=FAILED, 3=SUCCESS
 	Steps          []*Step   `json:"steps"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -155,9 +163,9 @@ type Swap struct {
 
 // SwapStatusResponse represents the response for swap status query
 type SwapStatusResponse struct {
-	SwapID         string    `json:"swap_id"`
-	State          SwapState `json:"state"`
-	Steps          []*Step   `json:"steps"`
-	FailReasonCode string    `json:"fail_reason_code,omitempty"`
-	FailMessage    string    `json:"fail_message,omitempty"`
+	SwapID         string  `json:"swap_id"`
+	Status         int     `json:"status"` // 0=CREATED, 1=PENDING, 2=FAILED, 3=SUCCESS
+	Steps          []*Step `json:"steps"`
+	FailReasonCode string  `json:"fail_reason_code,omitempty"`
+	FailMessage    string  `json:"fail_message,omitempty"`
 }

@@ -11,8 +11,8 @@ import (
 
 type ChainToken struct {
 	Guid       string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
-	ChainUUID  string    `gorm:"column:chain_uuid;type:varchar(255);default:''" json:"chain_uuid"`
-	TokenUUID  string    `gorm:"column:token_uuid;type:varchar(255);not null" json:"token_uuid"`
+	ChainID    string    `gorm:"column:chain_id;type:varchar(255);default:''" json:"chain_id"`
+	TokenID    string    `gorm:"column:token_id;type:varchar(255);not null" json:"token_id"`
 	CreateTime time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
 	UpdateTime time.Time `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
 }
@@ -23,8 +23,8 @@ func (ChainToken) TableName() string {
 
 type ChainTokenView interface {
 	GetByGuid(guid string) (*ChainToken, error)
-	GetByChainUUID(chainUUID string) ([]*ChainToken, error)
-	GetByTokenUUID(tokenUUID string) ([]*ChainToken, error)
+	GetByChainID(chainID string) ([]*ChainToken, error)
+	GetByTokenID(tokenID string) ([]*ChainToken, error)
 }
 
 type ChainTokenDB interface {
@@ -68,19 +68,19 @@ func (db *chainTokenDB) GetByGuid(guid string) (*ChainToken, error) {
 	return &item, nil
 }
 
-func (db *chainTokenDB) GetByChainUUID(chainUUID string) ([]*ChainToken, error) {
+func (db *chainTokenDB) GetByChainID(chainID string) ([]*ChainToken, error) {
 	var list []*ChainToken
-	if err := db.gorm.Where("chain_uuid = ?", chainUUID).Find(&list).Error; err != nil {
-		log.Error("GetByChainUUID ChainToken error", "err", err)
+	if err := db.gorm.Where("chain_id = ?", chainID).Find(&list).Error; err != nil {
+		log.Error("GetByChainID ChainToken error", "err", err)
 		return nil, err
 	}
 	return list, nil
 }
 
-func (db *chainTokenDB) GetByTokenUUID(tokenUUID string) ([]*ChainToken, error) {
+func (db *chainTokenDB) GetByTokenID(tokenID string) ([]*ChainToken, error) {
 	var list []*ChainToken
-	if err := db.gorm.Where("token_uuid = ?", tokenUUID).Find(&list).Error; err != nil {
-		log.Error("GetByTokenUUID ChainToken error", "err", err)
+	if err := db.gorm.Where("token_id = ?", tokenID).Find(&list).Error; err != nil {
+		log.Error("GetByTokenID ChainToken error", "err", err)
 		return nil, err
 	}
 	return list, nil

@@ -11,13 +11,13 @@ import (
 
 type MarketPrice struct {
 	Guid        string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
-	ChainUUID   string    `gorm:"column:chain_uuid;type:varchar(255);default:''" json:"chain_uuid"`
-	TokenUUID   string    `gorm:"column:token_uuid;type:varchar(255);default:''" json:"token_uuid"`
+	ChainID     string    `gorm:"column:chain_id;type:varchar(255);default:''" json:"chain_id"`
+	TokenID     string    `gorm:"column:token_id;type:varchar(255);default:''" json:"token_id"`
 	UsdtPrice   string    `gorm:"column:usdt_price;type:numeric(20,8);not null" json:"usdt_price"`
 	UsdPrice    string    `gorm:"column:usd_price;type:numeric(20,8);not null" json:"usd_price"`
-	MarketCap   int64     `gorm:"column:market_cap;type:integer" json:"market_cap"`
-	Liquidity   int64     `gorm:"column:liquidity;type:integer" json:"liquidity"`
-	Volume24h   int64     `gorm:"column:24h_volume;type:integer" json:"24h_volume"`
+	MarketCap   string    `gorm:"column:market_cap;type:numeric(20,2)" json:"market_cap"` // 市值（美元）
+	Liquidity   string    `gorm:"column:liquidity;type:numeric(20,2)" json:"liquidity"`   // 流动性（美元）
+	Volume24h   string    `gorm:"column:24h_volume;type:numeric(20,2)" json:"24h_volume"` // 24小时成交量（美元）
 	PriceChange string    `gorm:"column:price_change;type:varchar(255);not null" json:"price_change"`
 	Ranking     string    `gorm:"column:ranking;type:varchar(255);not null" json:"ranking"`
 	CreateTime  time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
@@ -30,7 +30,7 @@ func (MarketPrice) TableName() string {
 
 type MarketPriceView interface {
 	GetByGuid(guid string) (*MarketPrice, error)
-	GetByTokenUUID(tokenUUID string) (*MarketPrice, error)
+	GetByTokenID(tokenID string) (*MarketPrice, error)
 }
 
 type MarketPriceDB interface {
@@ -74,10 +74,10 @@ func (db *marketPriceDB) GetByGuid(guid string) (*MarketPrice, error) {
 	return &m, nil
 }
 
-func (db *marketPriceDB) GetByTokenUUID(tokenUUID string) (*MarketPrice, error) {
+func (db *marketPriceDB) GetByTokenID(tokenID string) (*MarketPrice, error) {
 	var m MarketPrice
-	if err := db.gorm.Where("token_uuid = ?", tokenUUID).First(&m).Error; err != nil {
-		log.Error("GetByTokenUUID MarketPrice error", "err", err)
+	if err := db.gorm.Where("token_id = ?", tokenID).First(&m).Error; err != nil {
+		log.Error("GetByTokenID MarketPrice error", "err", err)
 		return nil, err
 	}
 	return &m, nil

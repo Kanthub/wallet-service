@@ -13,7 +13,7 @@ type AssetAmountStat struct {
 	Guid       string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
 	AssetUUID  string    `gorm:"column:asset_uuid;type:varchar(255);default:''" json:"asset_uuid"`
 	TimeDate   string    `gorm:"column:time_date;type:varchar(255);not null" json:"time_date"`
-	Amount     int64     `gorm:"column:amount;type:integer" json:"amount"`
+	Amount     string    `gorm:"column:amount;type:numeric(78,0);not null" json:"amount"` // 使用 string 存储大数字（支持 uint256）
 	CreateTime time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
 	UpdateTime time.Time `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
 }

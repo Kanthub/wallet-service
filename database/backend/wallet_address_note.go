@@ -12,7 +12,7 @@ import (
 type WalletAddressNote struct {
 	Guid       string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
 	DeviceUUID string    `gorm:"column:device_uuid;type:varchar(255);not null" json:"device_uuid"`
-	ChainUUID  string    `gorm:"column:chain_uuid;type:varchar(255);default:''" json:"chain_uuid"`
+	ChainID    string    `gorm:"column:chain_id;type:varchar(255);default:''" json:"chain_id"`
 	Memo       string    `gorm:"column:memo;type:varchar(255);not null" json:"memo"`
 	Address    string    `gorm:"column:address;type:varchar(255);not null" json:"address"`
 	CreateTime time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`

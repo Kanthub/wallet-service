@@ -11,6 +11,9 @@ type Provider interface {
 	// GetQuote fetches a quote for the given request
 	GetQuote(ctx context.Context, req *backend.QuoteRequest) (*backend.Quote, error)
 
+	// BuildSwap builds the swap transaction based on the quote
+	BuildSwap(ctx context.Context, quote *backend.Quote, userAddress string) (*backend.BuildSwapResponse, error)
+
 	// Name returns the provider name
 	Name() string
 
