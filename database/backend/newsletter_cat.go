@@ -22,6 +22,7 @@ func (NewsletterCat) TableName() string {
 
 type NewsletterCatView interface {
 	GetByGuid(guid string) (*NewsletterCat, error)
+	ListAll() ([]*NewsletterCat, error)
 }
 
 type NewsletterCatDB interface {
@@ -80,4 +81,13 @@ func (db *newsletterCatDB) UpdateNewsletterCat(guid string, updates map[string]i
 		return err
 	}
 	return nil
+}
+
+func (db *newsletterCatDB) ListAll() ([]*NewsletterCat, error) {
+	var list []*NewsletterCat
+	if err := db.gorm.Order("created_at ASC").Find(&list).Error; err != nil {
+		log.Error("ListAll NewsletterCat error", "err", err)
+		return nil, err
+	}
+	return list, nil
 }

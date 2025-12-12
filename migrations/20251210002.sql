@@ -217,6 +217,9 @@ CREATE TABLE if not exists address_asset (
 );
 CREATE INDEX idx_address_asset_guid ON address_asset (guid);
 CREATE INDEX idx_address_asset_address_uuid ON address_asset (address_uuid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_address_asset_address_token
+ON address_asset (address_uuid, token_id);
+
 
 
 CREATE TABLE if not exists wallet_tx_record (
@@ -266,6 +269,9 @@ CREATE TABLE if not exists wallet_address_note (
 );
 CREATE INDEX idx_wallet_address_note_guid ON wallet_address_note (guid);
 CREATE INDEX idx_wallet_address_note_device_uuid ON wallet_address_note (device_uuid);
+CREATE UNIQUE INDEX uniq_wallet_address_note_device_chain_addr
+ON wallet_address_note (device_uuid, chain_id, address);
+
 
 
 CREATE TABLE if not exists fiat_currency_rate (
@@ -277,6 +283,9 @@ CREATE TABLE if not exists fiat_currency_rate (
 );
 CREATE INDEX idx_fiat_currency_rate_guid ON fiat_currency_rate (guid);
 CREATE INDEX idx_fiat_currency_rate_key_name ON fiat_currency_rate (key_name);
+CREATE UNIQUE INDEX uniq_fiat_currency_rate_key_name
+ON fiat_currency_rate (key_name);
+
 
 
 CREATE TABLE if not exists market_price (
@@ -322,6 +331,9 @@ CREATE TABLE IF NOT EXISTS newsletter_cat (
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_guid ON newsletter_cat(guid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_name
+ON newsletter_cat(cat_name);
+
 
 CREATE TABLE IF NOT EXISTS newsletter (
     guid          VARCHAR PRIMARY KEY,

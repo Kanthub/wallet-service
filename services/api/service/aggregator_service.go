@@ -12,12 +12,19 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/roothash-pay/wallet-services/common/redis"
+	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	dbBackend "github.com/roothash-pay/wallet-services/database/backend"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/inch"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/jupiter"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/lifi"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/zerox"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/store"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/utils"
 	"github.com/roothash-pay/wallet-services/services/api/models/backend"
+
 	"github.com/roothash-pay/wallet-services/services/common/chaininfo"
 	"github.com/roothash-pay/wallet-services/services/grpc_client/account"
 )
@@ -32,6 +39,114 @@ type AggregatorService struct {
 	db            *database.DB
 	quoteTTL      time.Duration
 	chainInfo     chaininfo.Provider
+}
+
+// initAggregatorService initializes the aggregator service with all dependencies
+func InitAggregatorService(db *database.DB, cfg *config.Config) (*AggregatorService, error) {
+	// Skip initialization if wallet account address is not configured
+	if cfg.AggregatorConfig.WalletAccountAddr == "" {
+		log.Warn("Aggregator service not initialized: wallet_account_addr not configured")
+		return nil, nil
+	}
+
+	// Create wallet account client
+	accountClient, err := account.NewWalletAccountClient(cfg.AggregatorConfig.WalletAccountAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create wallet account client: %w", err)
+	}
+
+	// Create providers
+	var providers []provider.Provider
+
+	// Initialize 0x provider if enabled
+	if cfg.AggregatorConfig.EnableProviders["0x"] && cfg.AggregatorConfig.ZeroXAPIURL != "" {
+		zeroXProvider := zerox.NewProvider(cfg.AggregatorConfig.ZeroXAPIURL, cfg.AggregatorConfig.ZeroXAPIKey)
+		providers = append(providers, zeroXProvider)
+		log.Info("0x provider initialized", "url", cfg.AggregatorConfig.ZeroXAPIURL)
+	}
+
+	// Initialize 1inch provider if enabled
+	if cfg.AggregatorConfig.EnableProviders["1inch"] && cfg.AggregatorConfig.OneInchAPIURL != "" {
+		oneInchProvider := inch.NewProvider(cfg.AggregatorConfig.OneInchAPIURL, cfg.AggregatorConfig.OneInchAPIKey)
+		providers = append(providers, oneInchProvider)
+		log.Info("1inch provider initialized", "url", cfg.AggregatorConfig.OneInchAPIURL)
+	}
+
+	// Initialize Jupiter provider if enabled
+	if cfg.AggregatorConfig.EnableProviders["jupiter"] && cfg.AggregatorConfig.JupiterAPIURL != "" {
+		jupiterProvider := jupiter.NewProvider(cfg.AggregatorConfig.JupiterAPIURL)
+		providers = append(providers, jupiterProvider)
+		log.Info("Jupiter provider initialized", "url", cfg.AggregatorConfig.JupiterAPIURL)
+	}
+
+	// Create Redis client
+	var redisClient *redis.Client
+	if cfg.RedisConfig.Addr != "" {
+		var err error
+		redisClient, err = redis.NewClient(&cfg.RedisConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Redis client: %w", err)
+		}
+		log.Info("Redis client initialized", "addr", cfg.RedisConfig.Addr)
+	} else {
+		log.Warn("Redis not configured, using in-memory storage (not recommended for production)")
+	}
+
+	// Initialize chain metadata cache
+	chainInfoManager := chaininfo.NewManager(
+		db.BackendChain,
+		redisClient,
+		cfg.AggregatorConfig.WalletAccountConsumerToken,
+		cfg.AggregatorConfig.ChainConsumerTokens,
+	)
+	if err := chainInfoManager.WarmUp(context.Background()); err != nil {
+		log.Warn("Failed to warm up chain info cache", "err", err)
+	}
+
+	// Create EVM caller for contract interactions
+	evmCaller := utils.NewEVMCaller(accountClient, chainInfoManager)
+
+	// Initialize LiFi provider if enabled
+	if cfg.AggregatorConfig.EnableProviders["lifi"] && cfg.AggregatorConfig.LiFiAPIURL != "" {
+		lifiProvider := lifi.NewProvider(cfg.AggregatorConfig.LiFiAPIURL, cfg.AggregatorConfig.LiFiAPIKey, evmCaller)
+		providers = append(providers, lifiProvider)
+		log.Info("LiFi provider initialized", "url", cfg.AggregatorConfig.LiFiAPIURL)
+	}
+
+	if len(providers) == 0 {
+		log.Warn("Aggregator service not initialized: no providers enabled")
+		return nil, nil
+	}
+
+	// Create cache stores
+	var quoteStore store.QuoteStore
+	var swapStore store.SwapStore
+	if redisClient != nil {
+		quoteStore = store.NewRedisQuoteStore(redisClient.Client)
+		swapStore = store.NewRedisSwapStore(redisClient.Client)
+		log.Info("Using Redis-based storage")
+	} else {
+		quoteStore = store.NewInMemoryQuoteStore()
+		swapStore = store.NewInMemorySwapStore()
+		log.Warn("Cannot connect to Redis, using in-memory storage (data will be lost on restart)")
+	}
+
+	// Create validator
+	validator := utils.NewValidator()
+
+	// Create aggregator service
+	aggregatorService := NewAggregatorService(
+		providers,
+		quoteStore,
+		swapStore,
+		validator,
+		accountClient,
+		chainInfoManager,
+		db,
+	)
+
+	log.Info("Aggregator service initialized successfully", "providers", len(providers))
+	return aggregatorService, nil
 }
 
 // NewAggregatorService creates a new aggregator service

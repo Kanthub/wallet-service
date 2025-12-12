@@ -32,6 +32,13 @@ func (Kline) TableName() string {
 type KlineView interface {
 	GetByGuid(guid string) (*Kline, error)
 	GetByKey(tokenID, interval string, openTime time.Time) (*Kline, error)
+	GetKlines(
+		tokenID string,
+		interval string,
+		start time.Time,
+		end time.Time,
+		limit int,
+	) ([]*Kline, error)
 }
 
 type KlineDB interface {
@@ -48,6 +55,41 @@ type klineDB struct {
 
 func NewKlineDB(db *gorm.DB) KlineDB {
 	return &klineDB{gorm: db}
+}
+
+func (db *klineDB) GetKlines(
+	tokenID string,
+	interval string,
+	start time.Time,
+	end time.Time,
+	limit int,
+) ([]*Kline, error) {
+
+	if limit <= 0 {
+		limit = 500
+	}
+
+	var list []*Kline
+	query := db.gorm.Model(&Kline{}).
+		Where("token_id = ?", tokenID).
+		Where("time_interval = ?", interval)
+
+	if !start.IsZero() {
+		query = query.Where("open_time >= ?", start)
+	}
+	if !end.IsZero() {
+		query = query.Where("open_time <= ?", end)
+	}
+
+	if err := query.
+		Order("open_time ASC").
+		Limit(limit).
+		Find(&list).Error; err != nil {
+		log.Error("GetKlines error", "err", err)
+		return nil, err
+	}
+
+	return list, nil
 }
 
 func (db *klineDB) StoreKline(k *Kline) error {
