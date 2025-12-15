@@ -3,9 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"sort"
 	"strings"
@@ -15,14 +12,18 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/roothash-pay/wallet-services/common/redis"
 	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	dbBackend "github.com/roothash-pay/wallet-services/database/backend"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/inch"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/jupiter"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/lifi"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/oneinch"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/zerox"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/store"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/utils"
@@ -70,7 +71,7 @@ func InitAggregatorService(db *database.DB, cfg *config.Config) (*AggregatorServ
 
 	// Initialize 1inch provider if enabled
 	if cfg.AggregatorConfig.EnableProviders["1inch"] && cfg.AggregatorConfig.OneInchAPIURL != "" {
-		oneInchProvider := inch.NewProvider(cfg.AggregatorConfig.OneInchAPIURL, cfg.AggregatorConfig.OneInchAPIKey)
+		oneInchProvider := oneinch.NewProvider(cfg.AggregatorConfig.OneInchAPIURL, cfg.AggregatorConfig.OneInchAPIKey)
 		providers = append(providers, oneInchProvider)
 		log.Info("1inch provider initialized", "url", cfg.AggregatorConfig.OneInchAPIURL)
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/oneinch"
 	"net"
 	"net/http"
 	"strconv"
@@ -12,13 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/roothash-pay/wallet-services/common/redis"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/jupiter"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/lifi"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/zerox"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/store"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/utils"
 	"github.com/roothash-pay/wallet-services/services/api/validator"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -167,6 +159,8 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 
 	apiRouter.Use(middleware.Heartbeat(HealthPath))
 
+	apiRouter.Get("/swagger/*", httpSwagger.WrapHandler)
+
 	apiRouter.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		log.Warn("NotFoundHandler hit", "path", r.URL.Path, "method", r.Method)
 		http.Error(w, "route not found", http.StatusNotFound)
@@ -176,22 +170,6 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 		log.Warn("MethodNotAllowedHandler hit", "path", r.URL.Path, "method", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	})
-
-	// Swagger UI
-	apiRouter.Get("/swagger/*", httpSwagger.WrapHandler)
-	swaggerURL := fmt.Sprintf("http://%s:%d/swagger/index.html", cfg.HttpServer.Host, cfg.HttpServer.Port)
-	log.Info("Swagger UI available", "url", swaggerURL)
-
-	/*
-	 * ============== backend ===============
-	 */
-
-	apiRouter.Post(fmt.Sprintf(AdminLoginV1Path), h.AdminLoginHandler)
-	apiRouter.Post(fmt.Sprintf(AdminLogoutV1Path), h.AdminLogoutHandler)
-
-	/*
-	 * ============== frontend ===============
-	 */
 
 	// Initialize Aggregator service and register routes
 	aggregatorService, err := service.InitAggregatorService(a.db, cfg)
@@ -224,7 +202,6 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 	h.KlineApi()
 	h.NewsletterCatApi()
 	h.NewsletterApi()
-	h.WalletBalanceApi()
 
 	a.router = apiRouter
 }
@@ -275,112 +252,4 @@ func parseCORSOrigins(origins string) []string {
 		}
 	}
 	return result
-}
-
-// initAggregatorService initializes the aggregator service with all dependencies
-func (a *API) initAggregatorService(cfg *config.Config) (*service.AggregatorService, error) {
-	// Skip initialization if wallet account address is not configured
-	if cfg.AggregatorConfig.WalletAccountAddr == "" {
-		log.Warn("Aggregator service not initialized: wallet_account_addr not configured")
-		return nil, nil
-	}
-
-	// Create wallet account client
-	accountClient, err := account.NewWalletAccountClient(cfg.AggregatorConfig.WalletAccountAddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create wallet account client: %w", err)
-	}
-
-	// Create providers
-	var providers []provider.Provider
-
-	// Initialize 0x provider if enabled
-	if cfg.AggregatorConfig.EnableProviders["0x"] && cfg.AggregatorConfig.ZeroXAPIURL != "" {
-		zeroXProvider := zerox.NewProvider(cfg.AggregatorConfig.ZeroXAPIURL, cfg.AggregatorConfig.ZeroXAPIKey)
-		providers = append(providers, zeroXProvider)
-		log.Info("0x provider initialized", "url", cfg.AggregatorConfig.ZeroXAPIURL)
-	}
-
-	// Initialize 1inch provider if enabled
-	if cfg.AggregatorConfig.EnableProviders["1inch"] && cfg.AggregatorConfig.OneInchAPIURL != "" {
-		oneInchProvider := oneinch.NewProvider(cfg.AggregatorConfig.OneInchAPIURL, cfg.AggregatorConfig.OneInchAPIKey)
-		providers = append(providers, oneInchProvider)
-		log.Info("1inch provider initialized", "url", cfg.AggregatorConfig.OneInchAPIURL)
-	}
-
-	// Initialize Jupiter provider if enabled
-	if cfg.AggregatorConfig.EnableProviders["jupiter"] && cfg.AggregatorConfig.JupiterAPIURL != "" {
-		jupiterProvider := jupiter.NewProvider(cfg.AggregatorConfig.JupiterAPIURL)
-		providers = append(providers, jupiterProvider)
-		log.Info("Jupiter provider initialized", "url", cfg.AggregatorConfig.JupiterAPIURL)
-	}
-
-	// Create Redis client
-	var redisClient *redis.Client
-	if cfg.RedisConfig.Addr != "" {
-		var err error
-		redisClient, err = redis.NewClient(&cfg.RedisConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Redis client: %w", err)
-		}
-		log.Info("Redis client initialized", "addr", cfg.RedisConfig.Addr)
-	} else {
-		log.Warn("Redis not configured, using in-memory storage (not recommended for production)")
-	}
-
-	// Initialize chain metadata cache
-	chainInfoManager := chaininfo.NewManager(
-		a.db.BackendChain,
-		redisClient,
-		cfg.AggregatorConfig.WalletAccountConsumerToken,
-		cfg.AggregatorConfig.ChainConsumerTokens,
-	)
-	if err := chainInfoManager.WarmUp(context.Background()); err != nil {
-		log.Warn("Failed to warm up chain info cache", "err", err)
-	}
-
-	// Create EVM caller for contract interactions
-	evmCaller := utils.NewEVMCaller(accountClient, chainInfoManager)
-
-	// Initialize LiFi provider if enabled
-	if cfg.AggregatorConfig.EnableProviders["lifi"] && cfg.AggregatorConfig.LiFiAPIURL != "" {
-		lifiProvider := lifi.NewProvider(cfg.AggregatorConfig.LiFiAPIURL, cfg.AggregatorConfig.LiFiAPIKey, evmCaller)
-		providers = append(providers, lifiProvider)
-		log.Info("LiFi provider initialized", "url", cfg.AggregatorConfig.LiFiAPIURL)
-	}
-
-	if len(providers) == 0 {
-		log.Warn("Aggregator service not initialized: no providers enabled")
-		return nil, nil
-	}
-
-	// Create cache stores
-	var quoteStore store.QuoteStore
-	var swapStore store.SwapStore
-	if redisClient != nil {
-		quoteStore = store.NewRedisQuoteStore(redisClient.Client)
-		swapStore = store.NewRedisSwapStore(redisClient.Client)
-		log.Info("Using Redis-based storage")
-	} else {
-		quoteStore = store.NewInMemoryQuoteStore()
-		swapStore = store.NewInMemorySwapStore()
-		log.Warn("Cannot connect to Redis, using in-memory storage (data will be lost on restart)")
-	}
-
-	// Create validator
-	validator := utils.NewValidator()
-
-	// Create aggregator service
-	aggregatorService := service.NewAggregatorService(
-		providers,
-		quoteStore,
-		swapStore,
-		validator,
-		accountClient,
-		chainInfoManager,
-		a.db,
-	)
-
-	log.Info("Aggregator service initialized successfully", "providers", len(providers))
-	return aggregatorService, nil
 }

@@ -73,10 +73,10 @@ func New(v *validator.Validator,
 		chains = append(chains, ChainType(c))
 	}
 
-	dappLinkService, err := NewDappLinkService(cfg, chains...)
-	if err != nil {
-		panic(err)
-	}
+	//dappLinkService, err := NewDappLinkService(cfg, chains...)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	clients := make(map[ChainType]*rpc.Client)
 
@@ -130,9 +130,9 @@ func New(v *validator.Validator,
 		NewsletterCatService:     NewNewsletterCatService(db),
 		NewsletterService:        NewNewsletterService(db),
 		WalletBalanceService:     NewWalletBalanceService(db),
-		DappLinkService:          dappLinkService,
-		RpcService:               NewRpcService(cfg.RpcServer.RPCURL()),
-		Client:                   clients,
+		//DappLinkService:          dappLinkService,
+		RpcService: NewRpcService(cfg.RpcServer.RPCURL()),
+		Client:     clients,
 	}
 
 }

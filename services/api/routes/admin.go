@@ -20,8 +20,8 @@ func (rs *Routes) AdminManageApi() {
 		r.Get("/info", rs.getAdmin)
 		r.Get("/list", rs.listAdmins)
 
-		r.Post("login", rs.AdminLoginHandler)
-		r.Post("logout", rs.AdminLogoutHandler)
+		r.Post("/login", rs.AdminLoginHandler)
+		r.Post("/logout", rs.AdminLogoutHandler)
 	})
 }
 
