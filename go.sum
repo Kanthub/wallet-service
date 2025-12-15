@@ -94,6 +94,8 @@ github.com/crate-crypto/go-eth-kzg v1.4.0/go.mod h1:J9/u5sWfznSObptgfa92Jq8rTswn
 github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a h1:W8mUrRp6NOVl3J+MYp5kPMoUZPp7aOYHtaua31lwRHg=
 github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a/go.mod h1:sTwzHBvIzm2RfVCGNEBZgRyjwK40bVoun3ZnGOCafNM=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
+github.com/dapplink-labs/chain-explorer-api v0.0.4 h1:m5BDCBwAVgOEB6zqRbhMeVuxLHid0iaLCEQsCA/9myo=
+github.com/dapplink-labs/chain-explorer-api v0.0.4/go.mod h1:NN+abomqO9hKDmuegTSUKz2YpLd2KaGA2YsjHzfbwi4=
 github.com/dapplink-labs/wallet-chain-account v0.0.1 h1:bOqYzn1CknnpzVAZfeYkQ+eAKaZd3GxwCA8hyidZzqE=
 github.com/dapplink-labs/wallet-chain-account v0.0.1/go.mod h1:lJQhnK1VR5F/AT1/tiMqPQiTt3OnJ5RYj4aaWhtvU6Y=
 github.com/dave/jennifer v1.6.1/go.mod h1:nXbxhEmQfOZhWml3D1cDK5M1FLnMSozpbFN/m3RmGZc=

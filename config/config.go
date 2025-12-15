@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	yaml "gopkg.in/yaml.v2"
@@ -34,6 +35,20 @@ type Config struct {
 	CallerAddress             string           `yaml:"caller_address"`
 	RedisConfig               RedisConfig      `yaml:"redis_config"`
 	AggregatorConfig          AggregatorConfig `yaml:"aggregator_config"`
+
+	RpcConfig RpcConfig `yaml:"rpc_config"`
+	Chains    []string  `yaml:"chains"`
+}
+
+type RpcConfig struct {
+	EthRpc      string `yaml:"eth_rpc"`
+	ArbitrumRpc string `yaml:"arbitrum_rpc"`
+	PolygonRpc  string `yaml:"polygon_rpc"`
+	BaseRpc     string `yaml:"base_rpc"`
+	RootHashRpc string `yaml:"roothash_rpc"`
+	OpRpc       string `yaml:"op_rpc"`
+	DataApiUrl  string `yaml:"data_api_url"`
+	DataApiKey  string `yaml:"data_api_key"`
 }
 
 type DBConfig struct {
@@ -79,8 +94,10 @@ type CacheConfig struct {
 }
 
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Scheme string `yaml:"scheme"` // http / https
+	Host   string `yaml:"host"`
+	Port   int    `yaml:"port"`
+	Path   string `yaml:"path"` // 可选，比如 /v2/xxx
 }
 
 type KodoConfig struct {
@@ -139,4 +156,41 @@ func New(path string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func (c ServerConfig) RPCURL() string {
+	scheme := c.Scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+
+	host := c.Host
+	if c.Port > 0 {
+		host = fmt.Sprintf("%s:%d", c.Host, c.Port)
+	}
+
+	if c.Path != "" {
+		return fmt.Sprintf("%s://%s/%s", scheme, host, strings.TrimPrefix(c.Path, "/"))
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+func (c RpcConfig) RPC(chain string) (string, error) {
+	switch chain {
+	case "eth":
+		return c.EthRpc, nil
+	case "arbitrum":
+		return c.ArbitrumRpc, nil
+	case "polygon":
+		return c.PolygonRpc, nil
+	case "base":
+		return c.BaseRpc, nil
+	case "op":
+		return c.OpRpc, nil
+	case "roothash":
+		return c.RootHashRpc, nil
+	default:
+		return "", fmt.Errorf("unsupported chain %s", chain)
+	}
 }

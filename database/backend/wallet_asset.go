@@ -28,6 +28,9 @@ func (WalletAsset) TableName() string {
 type WalletAssetView interface {
 	GetByGuid(guid string) (*WalletAsset, error)
 	GetByTokenChain(tokenID, chainID string) (*WalletAsset, error)
+
+	GetByWalletUUID(walletUUID string) ([]*WalletAsset, error)
+	GetByWalletTokenChain(walletUUID, tokenID, chainID string) (*WalletAsset, error)
 }
 
 type WalletAssetDB interface {
@@ -95,4 +98,31 @@ func (db *walletAssetDB) UpdateWalletAsset(guid string, updates map[string]inter
 		return err
 	}
 	return nil
+}
+
+func (db *walletAssetDB) GetByWalletUUID(walletUUID string) ([]*WalletAsset, error) {
+	var list []*WalletAsset
+	if err := db.gorm.
+		Where("wallet_uuid = ?", walletUUID).
+		Find(&list).Error; err != nil {
+		log.Error("GetByWalletUUID WalletAsset error", "err", err)
+		return nil, err
+	}
+	return list, nil
+}
+
+func (db *walletAssetDB) GetByWalletTokenChain(
+	walletUUID, tokenID, chainID string,
+) (*WalletAsset, error) {
+
+	var a WalletAsset
+	if err := db.gorm.
+		Where("wallet_uuid = ? AND token_id = ? AND chain_id = ?",
+			walletUUID, tokenID, chainID).
+		First(&a).Error; err != nil {
+
+		log.Error("GetByWalletTokenChain error", "err", err)
+		return nil, err
+	}
+	return &a, nil
 }

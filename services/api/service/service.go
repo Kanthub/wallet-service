@@ -1,6 +1,10 @@
 package service
 
 import (
+	"context"
+
+	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	"github.com/roothash-pay/wallet-services/database/backend"
@@ -44,6 +48,11 @@ type HandlerSvc struct {
 	KlineService             KlineService
 	NewsletterCatService     NewsletterCatService
 	NewsletterService        NewsletterService
+	WalletBalanceService     WalletBalanceService
+
+	DappLinkService DappLinkService
+	RpcService      RpcService
+	Client          map[ChainType]*rpc.Client
 }
 
 func New(v *validator.Validator,
@@ -58,6 +67,33 @@ func New(v *validator.Validator,
 	jwtSecret string,
 	domain string,
 ) *HandlerSvc {
+
+	chains := make([]ChainType, 0, len(cfg.Chains))
+	for _, c := range cfg.Chains {
+		chains = append(chains, ChainType(c))
+	}
+
+	dappLinkService, err := NewDappLinkService(cfg, chains...)
+	if err != nil {
+		panic(err)
+	}
+
+	clients := make(map[ChainType]*rpc.Client)
+
+	for _, chain := range chains {
+		rpcURL, err := cfg.RpcConfig.RPC(string(chain))
+		if err != nil {
+			panic(err)
+		}
+
+		client, err := rpc.DialContext(context.Background(), rpcURL)
+		if err != nil {
+			panic(err)
+		}
+
+		clients[chain] = client
+	}
+
 	return &HandlerSvc{
 		v:                    v,
 		db:                   db,
@@ -93,6 +129,10 @@ func New(v *validator.Validator,
 		KlineService:             NewKlineService(db),
 		NewsletterCatService:     NewNewsletterCatService(db),
 		NewsletterService:        NewNewsletterService(db),
+		WalletBalanceService:     NewWalletBalanceService(db),
+		DappLinkService:          dappLinkService,
+		RpcService:               NewRpcService(cfg.RpcServer.RPCURL()),
+		Client:                   clients,
 	}
 
 }

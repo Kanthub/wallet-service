@@ -19,6 +19,9 @@ type WalletService interface {
 		page, pageSize int,
 		filters map[string]interface{},
 	) ([]*backend.Wallet, int64, error)
+	IsExistRawTx(rawTx string) bool
+	StoreRawTx(rawTx string, txHash string) error
+	QueryTxInfoByHash(txHash string) (*backend.QueueTx, error)
 }
 
 type CreateWalletRequest struct {
@@ -113,4 +116,16 @@ func (s *walletService) ListWallets(
 ) ([]*backend.Wallet, int64, error) {
 
 	return s.db.BackendWallet.GetWalletList(page, pageSize, filters)
+}
+
+func (s *walletService) IsExistRawTx(rawTx string) bool {
+	return s.db.QueneTxDB.ExistQueueTx(rawTx)
+}
+
+func (s *walletService) StoreRawTx(rawTx string, txHash string) error {
+	return s.db.QueneTxDB.StoreRawTx(rawTx, txHash)
+}
+
+func (s *walletService) QueryTxInfoByHash(txHash string) (*backend.QueueTx, error) {
+	return s.db.QueneTxDB.QueryTxInfoByHash(txHash)
 }

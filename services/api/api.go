@@ -197,6 +197,7 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 	h.KlineApi()
 	h.NewsletterCatApi()
 	h.NewsletterApi()
+	h.WalletBalanceApi()
 
 	a.router = apiRouter
 }
