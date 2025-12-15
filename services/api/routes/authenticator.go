@@ -4,10 +4,20 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/roothash-pay/wallet-services/services/api/models"
 )
+
+func (rs *Routes) AuthenticatorApi() {
+	r := rs.router
+	r.Route("/api/v1/authenticator", func(r chi.Router) {
+		r.Post("/generate", rs.GenerateTOTPHandler)
+		r.Post("/verify", rs.VerifyTOTPHandler)
+	})
+}
 
 // GenerateTOTPHandler godoc
 // @Summary 生成TOTP密钥
@@ -27,7 +37,7 @@ func (rs *Routes) GenerateTOTPHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := rs.svc.GenerateTOTP(req)
+	resp, err := rs.svc.AuthenticatorService.GenerateTOTP(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -57,7 +67,7 @@ func (rs *Routes) VerifyTOTPHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := rs.svc.VerifyTOTP(req)
+	resp, err := rs.svc.AuthenticatorService.VerifyTOTP(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

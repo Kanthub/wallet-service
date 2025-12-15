@@ -38,6 +38,7 @@ type DB struct {
 	BackendWalletAddressNote backend.WalletAddressNoteDB
 	BackendWalletAsset       backend.WalletAssetDB
 	BackendWalletTxRecord    backend.WalletTxRecordDB
+	QueneTxDB                backend.QueueTxDB
 }
 
 func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
@@ -91,6 +92,7 @@ func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
 		BackendWalletAddressNote: backend.NewWalletAddressNoteDB(gorms),
 		BackendWalletAsset:       backend.NewWalletAssetDB(gorms),
 		BackendWalletTxRecord:    backend.NewWalletTxRecordDB(gorms),
+		QueneTxDB:                backend.NewQueueTxDB(gorms),
 	}
 	return db, nil
 }
@@ -119,6 +121,7 @@ func (db *DB) Transaction(fn func(db *DB) error) error {
 			BackendWalletAddressNote: backend.NewWalletAddressNoteDB(tx),
 			BackendWalletAsset:       backend.NewWalletAssetDB(tx),
 			BackendWalletTxRecord:    backend.NewWalletTxRecordDB(tx),
+			QueneTxDB:                backend.NewQueueTxDB(tx),
 		}
 		return fn(txDB)
 	})

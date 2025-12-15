@@ -23,11 +23,11 @@ type Claims struct {
 
 type Routes struct {
 	router *chi.Mux
-	svc    service.Service
+	svc    *service.HandlerSvc
 }
 
 // NewRoutes ... Construct a new route handler instance
-func NewRoutes(r *chi.Mux, svc service.Service) Routes {
+func NewRoutes(r *chi.Mux, svc *service.HandlerSvc) Routes {
 	return Routes{
 		router: r,
 		svc:    svc,

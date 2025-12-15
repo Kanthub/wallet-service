@@ -6,19 +6,21 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type AddressAsset struct {
-	Guid        string    `gorm:"primaryKey;column:guid;type:text" json:"guid"`
-	TokenID     string    `gorm:"column:token_id;type:varchar(255);default:''" json:"token_id"`
-	WalletUUID  string    `gorm:"column:wallet_uuid;type:varchar(255);default:''" json:"wallet_uuid"`
-	AddressUUID string    `gorm:"column:address_uuid;type:varchar(255);default:''" json:"address_uuid"`
-	AssetUsdt   string    `gorm:"column:asset_usdt;type:numeric(20,8);not null" json:"asset_usdt"`
-	AssetUsd    string    `gorm:"column:asset_usd;type:numeric(20,8);not null" json:"asset_usd"`
-	Balance     string    `gorm:"column:balance;type:numeric(78,0);not null" json:"balance"` // 使用 string 存储大数字（支持 uint256）
-	CreateTime  time.Time `gorm:"column:created_at;autoCreateTime" json:"create_time"`
-	UpdateTime  time.Time `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
+	Guid        string          `gorm:"primaryKey;column:guid;type:text" json:"guid"`
+	TokenID     string          `gorm:"column:token_id;type:varchar(255);default:''" json:"token_id"`
+	WalletUUID  string          `gorm:"column:wallet_uuid;type:varchar(255);default:''" json:"wallet_uuid"`
+	AddressUUID string          `gorm:"column:address_uuid;type:varchar(255);default:''" json:"address_uuid"`
+	AssetUsdt   decimal.Decimal `gorm:"column:asset_usdt;type:numeric(20,8);not null" json:"asset_usdt"`
+	AssetUsd    decimal.Decimal `gorm:"column:asset_usd;type:numeric(20,8);not null" json:"asset_usd"`
+	Balance     decimal.Decimal `gorm:"column:balance;type:numeric(78,0);not null" json:"balance"` // 使用 string 存储大数字（支持 uint256）
+	CreateTime  time.Time       `gorm:"column:created_at;autoCreateTime" json:"create_time"`
+	UpdateTime  time.Time       `gorm:"column:updated_at;autoUpdateTime" json:"update_time"`
 }
 
 func (AddressAsset) TableName() string {
@@ -28,71 +30,112 @@ func (AddressAsset) TableName() string {
 type AddressAssetView interface {
 	GetByGuid(guid string) (*AddressAsset, error)
 	GetByAddressUUID(addressUUID string) ([]*AddressAsset, error)
+	GetByAddressAndToken(addressUUID, tokenID string) (*AddressAsset, error)
 }
 
 type AddressAssetDB interface {
 	AddressAssetView
 
-	StoreAddressAsset(a *AddressAsset) error
-	StoreAddressAssets(list []*AddressAsset) error
-	UpdateAddressAsset(guid string, updates map[string]interface{}) error
+	UpsertAddressAsset(a *AddressAsset) error
+	UpsertAddressAssets(list []*AddressAsset) error
 }
 
 type addressAssetDB struct {
-	gorm *gorm.DB
+	db *gorm.DB
 }
 
 func NewAddressAssetDB(db *gorm.DB) AddressAssetDB {
-	return &addressAssetDB{gorm: db}
+	return &addressAssetDB{db: db}
 }
+func (r *addressAssetDB) UpsertAddressAsset(a *AddressAsset) error {
+	if a.AddressUUID == "" || a.TokenID == "" {
+		return fmt.Errorf("address_uuid and token_id cannot be empty")
+	}
 
-func (db *addressAssetDB) StoreAddressAsset(a *AddressAsset) error {
-	if err := db.gorm.Create(a).Error; err != nil {
-		log.Error("StoreAddressAsset error", "err", err)
+	a.UpdateTime = time.Now()
+
+	err := r.db.
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "address_uuid"}, {Name: "token_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"wallet_uuid",
+				"asset_usdt",
+				"asset_usd",
+				"balance",
+				"updated_at",
+			}),
+		}).
+		Create(a).Error
+
+	if err != nil {
+		log.Error("UpsertAddressAsset error", "err", err)
 		return err
 	}
 	return nil
 }
 
-func (db *addressAssetDB) StoreAddressAssets(list []*AddressAsset) error {
-	if err := db.gorm.CreateInBatches(list, len(list)).Error; err != nil {
-		log.Error("StoreAddressAssets error", "err", err)
+func (r *addressAssetDB) UpsertAddressAssets(list []*AddressAsset) error {
+	if len(list) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	for _, a := range list {
+		if a.AddressUUID == "" || a.TokenID == "" {
+			return fmt.Errorf("address_uuid and token_id cannot be empty")
+		}
+		a.UpdateTime = now
+	}
+
+	const batchSize = 100
+
+	err := r.db.
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "address_uuid"}, {Name: "token_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"wallet_uuid",
+				"asset_usdt",
+				"asset_usd",
+				"balance",
+				"updated_at",
+			}),
+		}).
+		CreateInBatches(list, batchSize).Error
+
+	if err != nil {
+		log.Error("UpsertAddressAssets error", "err", err)
 		return err
 	}
 	return nil
 }
 
-func (db *addressAssetDB) GetByGuid(guid string) (*AddressAsset, error) {
+func (r *addressAssetDB) GetByGuid(guid string) (*AddressAsset, error) {
 	var a AddressAsset
-	if err := db.gorm.Where("guid = ?", guid).First(&a).Error; err != nil {
+	if err := r.db.Where("guid = ?", guid).First(&a).Error; err != nil {
 		log.Error("GetByGuid AddressAsset error", "err", err)
 		return nil, err
 	}
 	return &a, nil
 }
 
-func (db *addressAssetDB) GetByAddressUUID(addressUUID string) ([]*AddressAsset, error) {
+func (r *addressAssetDB) GetByAddressUUID(addressUUID string) ([]*AddressAsset, error) {
 	var list []*AddressAsset
-	if err := db.gorm.Where("address_uuid = ?", addressUUID).Find(&list).Error; err != nil {
+	if err := r.db.Where("address_uuid = ?", addressUUID).Find(&list).Error; err != nil {
 		log.Error("GetByAddressUUID AddressAsset error", "err", err)
 		return nil, err
 	}
 	return list, nil
 }
 
-func (db *addressAssetDB) UpdateAddressAsset(guid string, updates map[string]interface{}) error {
-	if guid == "" {
-		return fmt.Errorf("invalid guid")
+func (r *addressAssetDB) GetByAddressAndToken(addressUUID, tokenID string) (*AddressAsset, error) {
+	var a AddressAsset
+	if err := r.db.Where("address_uuid = ? AND token_id = ?", addressUUID, tokenID).First(&a).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		log.Error("GetByAddressAndToken AddressAsset error", "err", err,
+			"address_uuid", addressUUID, "token_id", tokenID)
+		return nil, err
 	}
-	if len(updates) == 0 {
-		return fmt.Errorf("updates is empty")
-	}
-
-	updates["updated_at"] = time.Now()
-
-	if err := db.gorm.Model(&AddressAsset{}).Where("guid = ?", guid).Updates(updates).Error; err != nil {
-		log.Error("UpdateAddressAsset error", "err", err)
-		return err
-	}
-	return nil
+	return &a, nil
 }

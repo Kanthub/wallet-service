@@ -1,31 +1,22 @@
 package service
 
 import (
+	"context"
+
+	"github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	"github.com/roothash-pay/wallet-services/database/backend"
-	"github.com/roothash-pay/wallet-services/services/api/models"
-	backend2 "github.com/roothash-pay/wallet-services/services/api/models/backend"
 	"github.com/roothash-pay/wallet-services/services/api/validator"
 	"github.com/roothash-pay/wallet-services/services/common"
 )
 
-type Service interface {
-	/*
-	* ============== authenticator ==============
-	 */
-	GenerateTOTP(req models.GenerateTOTPRequest) (*models.GenerateTOTPResponse, error)
-	VerifyTOTP(req models.VerifyTOTPRequest) (*models.VerifyTOTPResponse, error)
-
-	/*
-	* ============== backend user ==============
-	 */
-	AdminUserLogin(req backend2.AdminLoginRequest) (*backend2.AdminLoginResponse, error)
-	AdminLogout(req backend2.AdminLogoutRequest) (*backend2.AdminLogoutResponse, error)
-}
-
 type HandlerSvc struct {
-	v                    *validator.Validator
-	db                   *database.DB
+	v   *validator.Validator
+	db  *database.DB
+	cfg *config.Config
+
 	backendAdminDB       backend.AdminDB
 	emailService         *common.EmailService
 	smsService           *common.SMSService
@@ -35,10 +26,38 @@ type HandlerSvc struct {
 	kodoService          *common.KodoService
 	s3Service            *common.S3Service
 	jwtSecret            string
+
+	AddressAssetService      AddressAssetService
+	AdminService             AdminService
+	AuthService              AuthService
+	AuthenticatorService     AuthenticatorService
+	RoleService              RoleService
+	RoleAuthService          RoleAuthService
+	SysLogService            SysLogService
+	ChainService             ChainService
+	TokenService             TokenService
+	ChainTokenService        ChainTokenService
+	WalletService            WalletService
+	WalletAddressService     WalletAddressService
+	WalletAssetService       WalletAssetService
+	AssetAmountStatService   AssetAmountStatService
+	WalletTxRecordService    WalletTxRecordService
+	WalletAddressNoteService WalletAddressNoteService
+	FiatCurrencyRateService  FiatCurrencyRateService
+	MarketPriceService       MarketPriceService
+	KlineService             KlineService
+	NewsletterCatService     NewsletterCatService
+	NewsletterService        NewsletterService
+	WalletBalanceService     WalletBalanceService
+
+	DappLinkService DappLinkService
+	RpcService      RpcService
+	Client          map[ChainType]*rpc.Client
 }
 
 func New(v *validator.Validator,
 	db *database.DB,
+	cfg *config.Config,
 	backendUserDB backend.AdminDB,
 	emailService *common.EmailService,
 	smsService *common.SMSService,
@@ -47,10 +66,38 @@ func New(v *validator.Validator,
 	s3Service *common.S3Service,
 	jwtSecret string,
 	domain string,
-) Service {
+) *HandlerSvc {
+
+	chains := make([]ChainType, 0, len(cfg.Chains))
+	for _, c := range cfg.Chains {
+		chains = append(chains, ChainType(c))
+	}
+
+	dappLinkService, err := NewDappLinkService(cfg, chains...)
+	if err != nil {
+		panic(err)
+	}
+
+	clients := make(map[ChainType]*rpc.Client)
+
+	for _, chain := range chains {
+		rpcURL, err := cfg.RpcConfig.RPC(string(chain))
+		if err != nil {
+			panic(err)
+		}
+
+		client, err := rpc.DialContext(context.Background(), rpcURL)
+		if err != nil {
+			panic(err)
+		}
+
+		clients[chain] = client
+	}
+
 	return &HandlerSvc{
 		v:                    v,
 		db:                   db,
+		cfg:                  cfg,
 		backendAdminDB:       backendUserDB,
 		emailService:         emailService,
 		smsService:           smsService,
@@ -60,5 +107,32 @@ func New(v *validator.Validator,
 		s3Service:            s3Service,
 		siweVerifier:         common.NewSIWEVerifier(jwtSecret, domain),
 		jwtSecret:            jwtSecret,
+
+		AddressAssetService:      NewAddressAssetService(db),
+		AdminService:             NewAdminService(db, common.NewSIWEVerifier(jwtSecret, domain)),
+		AuthService:              NewAuthService(db),
+		AuthenticatorService:     NewAuthenticatorService(&HandlerSvc{authenticatorService: authenticatorService}),
+		RoleService:              NewRoleService(db),
+		RoleAuthService:          NewRoleAuthService(db),
+		SysLogService:            NewSysLogService(db),
+		ChainService:             NewChainService(db),
+		TokenService:             NewTokenService(db),
+		ChainTokenService:        NewChainTokenService(db),
+		WalletService:            NewWalletService(db),
+		WalletAddressService:     NewWalletAddressService(db),
+		WalletAssetService:       NewWalletAssetService(db),
+		AssetAmountStatService:   NewAssetAmountStatService(db),
+		WalletTxRecordService:    NewWalletTxRecordService(db),
+		WalletAddressNoteService: NewWalletAddressNoteService(db),
+		FiatCurrencyRateService:  NewFiatCurrencyRateService(db),
+		MarketPriceService:       NewMarketPriceService(db),
+		KlineService:             NewKlineService(db),
+		NewsletterCatService:     NewNewsletterCatService(db),
+		NewsletterService:        NewNewsletterService(db),
+		WalletBalanceService:     NewWalletBalanceService(db),
+		DappLinkService:          dappLinkService,
+		RpcService:               NewRpcService(cfg.RpcServer.RPCURL()),
+		Client:                   clients,
 	}
+
 }

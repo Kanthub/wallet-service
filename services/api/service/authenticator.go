@@ -6,22 +6,38 @@ import (
 	"github.com/roothash-pay/wallet-services/services/api/models"
 )
 
-func (h *HandlerSvc) GenerateTOTP(req models.GenerateTOTPRequest) (*models.GenerateTOTPResponse, error) {
+type AuthenticatorService interface {
+	/*
+	* ============== authenticator ==============
+	 */
+	GenerateTOTP(req models.GenerateTOTPRequest) (*models.GenerateTOTPResponse, error)
+	VerifyTOTP(req models.VerifyTOTPRequest) (*models.VerifyTOTPResponse, error)
+}
+
+type authenticatorService struct {
+	h *HandlerSvc
+}
+
+func NewAuthenticatorService(h *HandlerSvc) AuthenticatorService {
+	return &authenticatorService{h: h}
+}
+
+func (au *authenticatorService) GenerateTOTP(req models.GenerateTOTPRequest) (*models.GenerateTOTPResponse, error) {
 	if req.UserId == "" {
 		return nil, fmt.Errorf("user id is required")
 	}
 
-	totpKey, err := h.authenticatorService.GenerateSecret(req.UserId)
+	totpKey, err := au.h.authenticatorService.GenerateSecret(req.UserId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate TOTP: %w", err)
 	}
 
-	currentCode, err := h.authenticatorService.GenerateCurrentCode(totpKey.Secret)
+	currentCode, err := au.h.authenticatorService.GenerateCurrentCode(totpKey.Secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate current code: %w", err)
 	}
 
-	remainingTime := h.authenticatorService.GetRemainingTime()
+	remainingTime := au.h.authenticatorService.GetRemainingTime()
 
 	return &models.GenerateTOTPResponse{
 		Secret:        totpKey.Secret,
@@ -33,7 +49,7 @@ func (h *HandlerSvc) GenerateTOTP(req models.GenerateTOTPRequest) (*models.Gener
 	}, nil
 }
 
-func (h *HandlerSvc) VerifyTOTP(req models.VerifyTOTPRequest) (*models.VerifyTOTPResponse, error) {
+func (au *authenticatorService) VerifyTOTP(req models.VerifyTOTPRequest) (*models.VerifyTOTPResponse, error) {
 	if req.Secret == "" {
 		return nil, fmt.Errorf("secret is required")
 	}
@@ -41,12 +57,12 @@ func (h *HandlerSvc) VerifyTOTP(req models.VerifyTOTPRequest) (*models.VerifyTOT
 		return nil, fmt.Errorf("code is required")
 	}
 
-	valid, err := h.authenticatorService.VerifyCode(req.Secret, req.Code)
+	valid, err := au.h.authenticatorService.VerifyCode(req.Secret, req.Code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify TOTP: %w", err)
 	}
 
-	remainingTime := h.authenticatorService.GetRemainingTime()
+	remainingTime := au.h.authenticatorService.GetRemainingTime()
 
 	message := "TOTP code is valid"
 	if !valid {

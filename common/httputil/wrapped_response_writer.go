@@ -1,6 +1,9 @@
 package httputil
 
-import "net/http"
+import (
+	"encoding/json"
+	"net/http"
+)
 
 type WrappedResponseWriter struct {
 	StatusCode  int
@@ -35,4 +38,21 @@ func (w *WrappedResponseWriter) WriteHeader(statusCode int) {
 	w.wroteHeader = true
 	w.StatusCode = statusCode
 	w.w.WriteHeader(statusCode)
+}
+
+func WriteSuccess(w http.ResponseWriter, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"code": 0,
+		"data": data,
+	})
+}
+
+func WriteError(w http.ResponseWriter, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(map[string]any{
+		"code": -1,
+		"msg":  msg,
+	})
 }
