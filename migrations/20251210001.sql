@@ -324,29 +324,44 @@ CREATE TABLE IF NOT EXISTS kline (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_kline_interval_time ON kline(token_id, time_interval, open_time);
 CREATE INDEX IF NOT EXISTS idx_kline_time ON kline(token_id, open_time DESC);
 
-CREATE TABLE IF NOT EXISTS newsletter_cat (
+CREATE TABLE IF NOT EXISTS topic_cat (
     guid          VARCHAR PRIMARY KEY,
     cat_name      VARCHAR NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_guid ON newsletter_cat(guid);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_name
-ON newsletter_cat(cat_name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_name ON newsletter_cat(cat_name);
 
-
-CREATE TABLE IF NOT EXISTS newsletter (
+CREATE TABLE IF NOT EXISTS topic (
     guid          VARCHAR PRIMARY KEY,
     cat_uuid      VARCHAR(255) NOT NULL,
     title         VARCHAR(255) NOT NULL,
     image         VARCHAR(700) NOT NULL,
     detail        TEXT DEFAULT '',
+    in_like       UINT256 NOT NULL,          -- 点赞 --
+    out_like      UINT256 NOT NULL,          -- 踩 --
     link_url      VARCHAR(255) NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_guid ON newsletter(guid);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_uuid ON newsletter(cat_uuid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_guid ON topic(guid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_cat_uuid ON topic(cat_uuid);
+
+CREATE TABLE IF NOT EXISTS topic_reply (
+    guid          VARCHAR PRIMARY KEY,
+    topic_uuid    VARCHAR(255) NOT NULL,
+    reply_uuid    VARCHAR(255) NOT NULL,
+    image         VARCHAR(700) NOT NULL,
+    detail        TEXT DEFAULT '',
+    in_like       UINT256 NOT NULL,          -- 点赞 --
+    out_like      UINT256 NOT NULL,          -- 踩 --
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_reply_guid ON topic_reply(guid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_reply_cat_uuid ON topic_reply(cat_uuid);
+
 
 -- table queue_tx
 CREATE TABLE IF NOT EXISTS queue_tx
