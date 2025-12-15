@@ -24,7 +24,7 @@ func NewRedisQuoteStore(client *redis.Client) *RedisQuoteStore {
 }
 
 // Save stores a quote with TTL in Redis
-func (s *RedisQuoteStore) Save(ctx context.Context, quoteID string, quote *backend.QuoteResponse, ttl time.Duration) error {
+func (s *RedisQuoteStore) Save(ctx context.Context, quoteID string, quote *backend.QuoteStore, ttl time.Duration) error {
 	// Serialize quote to JSON
 	data, err := json.Marshal(quote)
 	if err != nil {
@@ -40,8 +40,35 @@ func (s *RedisQuoteStore) Save(ctx context.Context, quoteID string, quote *backe
 	return nil
 }
 
+// Update quote
+func (s *RedisQuoteStore) Update(ctx context.Context, quoteID string, quote *backend.QuoteStore, ttl time.Duration) error {
+	// Serialize quote to JSON
+	data, err := json.Marshal(quote)
+	if err != nil {
+		return fmt.Errorf("failed to marshal quote: %w", err)
+	}
+
+	key := s.quoteKey(quoteID)
+
+	// Ensure key exists first
+	exists, err := s.client.Exists(ctx, key).Result()
+	if err != nil {
+		return fmt.Errorf("failed to check quote existence in Redis: %w", err)
+	}
+	if exists == 0 {
+		return fmt.Errorf("quote not found: %s", quoteID)
+	}
+
+	// Overwrite value and refresh TTL
+	if err := s.client.Set(ctx, key, data, ttl).Err(); err != nil {
+		return fmt.Errorf("failed to update quote in Redis: %w", err)
+	}
+
+	return nil
+}
+
 // Get retrieves a quote by ID from Redis
-func (s *RedisQuoteStore) Get(ctx context.Context, quoteID string) (*backend.QuoteResponse, error) {
+func (s *RedisQuoteStore) Get(ctx context.Context, quoteID string) (*backend.QuoteStore, error) {
 	key := s.quoteKey(quoteID)
 
 	// Get from Redis
@@ -53,7 +80,7 @@ func (s *RedisQuoteStore) Get(ctx context.Context, quoteID string) (*backend.Quo
 	}
 
 	// Deserialize
-	var quote backend.QuoteResponse
+	var quote backend.QuoteStore
 	if err := json.Unmarshal(data, &quote); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal quote: %w", err)
 	}

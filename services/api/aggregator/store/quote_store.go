@@ -11,14 +11,15 @@ import (
 
 // QuoteStore defines the interface for storing quotes
 type QuoteStore interface {
-	Save(ctx context.Context, quoteID string, quote *backend.QuoteResponse, ttl time.Duration) error
-	Get(ctx context.Context, quoteID string) (*backend.QuoteResponse, error)
+	Save(ctx context.Context, quoteID string, quote *backend.QuoteStore, ttl time.Duration) error
+	Update(ctx context.Context, quoteID string, quote *backend.QuoteStore, ttl time.Duration) error
+	Get(ctx context.Context, quoteID string) (*backend.QuoteStore, error)
 	Delete(ctx context.Context, quoteID string) error
 }
 
 // quoteEntry represents a quote with expiration
 type quoteEntry struct {
-	quote     *backend.QuoteResponse
+	quote     *backend.QuoteStore
 	expiresAt time.Time
 }
 
@@ -41,7 +42,7 @@ func NewInMemoryQuoteStore() *InMemoryQuoteStore {
 }
 
 // Save stores a quote with TTL
-func (s *InMemoryQuoteStore) Save(ctx context.Context, quoteID string, quote *backend.QuoteResponse, ttl time.Duration) error {
+func (s *InMemoryQuoteStore) Save(ctx context.Context, quoteID string, quote *backend.QuoteStore, ttl time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -54,7 +55,7 @@ func (s *InMemoryQuoteStore) Save(ctx context.Context, quoteID string, quote *ba
 }
 
 // Get retrieves a quote by ID
-func (s *InMemoryQuoteStore) Get(ctx context.Context, quoteID string) (*backend.QuoteResponse, error) {
+func (s *InMemoryQuoteStore) Get(ctx context.Context, quoteID string) (*backend.QuoteStore, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -68,6 +69,21 @@ func (s *InMemoryQuoteStore) Get(ctx context.Context, quoteID string) (*backend.
 	}
 
 	return entry.quote, nil
+}
+
+func (s *InMemoryQuoteStore) Update(ctx context.Context, quoteID string, quote *backend.QuoteStore, ttl time.Duration) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.quotes[quoteID]; !exists {
+		return fmt.Errorf("quote not found: %s", quoteID)
+	}
+
+	s.quotes[quoteID] = &quoteEntry{
+		quote:     quote,
+		expiresAt: time.Now().Add(ttl),
+	}
+	return nil
 }
 
 // Delete removes a quote

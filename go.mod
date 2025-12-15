@@ -31,8 +31,11 @@ require (
 	gorm.io/gorm v1.31.1
 )
 
+require github.com/swaggo/files v0.0.0-20220610200504-28940afbdbfe // indirect
+
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
@@ -87,6 +90,10 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
 	github.com/goccy/go-json v0.10.4 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
+	github.com/go-openapi/jsonpointer v0.19.5 // indirect
+	github.com/go-openapi/jsonreference v0.20.0 // indirect
+	github.com/go-openapi/spec v0.20.6 // indirect
+	github.com/go-openapi/swag v0.19.15 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
@@ -98,11 +105,13 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/minio/crc64nvme v1.1.0 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
@@ -127,6 +136,10 @@ require (
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/supranational/blst v0.3.16-0.20250831170142-f48500c1fdbe // indirect
+	github.com/swaggo/files/v2 v2.0.2 // indirect
+	github.com/swaggo/http-swagger v1.3.4
+	github.com/swaggo/http-swagger/v2 v2.0.2 // indirect
+	github.com/swaggo/swag v1.8.1 // indirect
 	github.com/tinylib/msgp v1.3.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect

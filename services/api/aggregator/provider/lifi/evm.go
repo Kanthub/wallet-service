@@ -11,28 +11,8 @@ import (
 	"github.com/roothash-pay/wallet-services/services/api/models/backend"
 )
 
-// GetQuote fetches a quote from LiFi for EVM chains
-func (p *Provider) GetQuote(ctx context.Context, req *backend.QuoteRequest) (*backend.Quote, error) {
-	lifiResp, err := p.fetchQuote(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to internal Quote format
-	quote := p.convertToQuote(req, lifiResp)
-
-	log.Info("LiFi GetQuote success",
-		"fromToken", req.FromToken,
-		"toToken", req.ToToken,
-		"fromAmount", req.Amount,
-		"toAmount", quote.ToAmount,
-	)
-
-	return quote, nil
-}
-
 // BuildSwap builds the swap transaction based on the quote for EVM chains
-func (p *Provider) BuildSwap(ctx context.Context, quote *backend.Quote, userAddress string) (*backend.BuildSwapResponse, error) {
+func (p *Provider) buildSwapEVM(ctx context.Context, quote *backend.Quote, userAddress string) (*backend.BuildSwapResponse, error) {
 	log.Info("LiFi BuildSwap called", "chainID", quote.ChainID, "userAddress", userAddress)
 
 	// Parse the raw LiFi response from quote
@@ -40,7 +20,7 @@ func (p *Provider) BuildSwap(ctx context.Context, quote *backend.Quote, userAddr
 		return nil, fmt.Errorf("quote.Raw is empty, cannot build swap")
 	}
 
-	var lifiResp QuoteResponse
+	var lifiResp LifiQuoteResponse
 	if err := json.Unmarshal([]byte(quote.Raw), &lifiResp); err != nil {
 		return nil, fmt.Errorf("failed to parse quote.Raw: %w", err)
 	}
@@ -124,7 +104,7 @@ func (p *Provider) BuildSwap(ctx context.Context, quote *backend.Quote, userAddr
 }
 
 // convertToQuote converts LiFi response to internal Quote format
-func (p *Provider) convertToQuote(req *backend.QuoteRequest, lifiResp *QuoteResponse) *backend.Quote {
+func (p *Provider) convertToQuoteEVM(req *backend.QuoteRequest, lifiResp *LifiQuoteResponse) *backend.Quote {
 	// Calculate total gas estimate
 	gasEstimate := "0"
 	if len(lifiResp.Estimate.GasCosts) > 0 {
@@ -144,7 +124,7 @@ func (p *Provider) convertToQuote(req *backend.QuoteRequest, lifiResp *QuoteResp
 		ChainID:     req.FromChainID,
 		FromToken:   req.FromToken,
 		ToToken:     req.ToToken,
-		FromAmount:  lifiResp.Estimate.FromAmount,
+		FromAmount:  req.Amount, // 用户手动输入的数量
 		ToAmount:    lifiResp.Estimate.ToAmount,
 		GasEstimate: gasEstimate,
 		Spender:     spender,

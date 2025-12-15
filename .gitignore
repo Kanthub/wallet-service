@@ -2,3 +2,4 @@
 .idea
 ./event-services
 event-services
+wallet-services-config.local.yaml

@@ -1,0 +1,506 @@
+basePath: /api/v1
+definitions:
+  backend.Action:
+    properties:
+      action_type:
+        $ref: '#/definitions/backend.ActionType'
+      chain_id:
+        type: string
+      description:
+        type: string
+      signing_payload:
+        $ref: '#/definitions/backend.SigningPayload'
+    type: object
+  backend.ActionType:
+    enum:
+    - APPROVE
+    - SWAP
+    - BRIDGE
+    - WRAP
+    - UNWRAP
+    type: string
+    x-enum-comments:
+      ActionTypeApprove: 授权操作
+      ActionTypeBridge: 跨链桥接
+      ActionTypeSwap: 交换操作
+      ActionTypeUnwrap: 解包装代币
+      ActionTypeWrap: 包装原生代币
+    x-enum-descriptions:
+    - 授权操作
+    - 交换操作
+    - 跨链桥接
+    - 包装原生代币
+    - 解包装代币
+    x-enum-varnames:
+    - ActionTypeApprove
+    - ActionTypeSwap
+    - ActionTypeBridge
+    - ActionTypeWrap
+    - ActionTypeUnwrap
+  backend.ChainType:
+    enum:
+    - EVM
+    - SOLANA
+    type: string
+    x-enum-varnames:
+    - ChainTypeEVM
+    - ChainTypeSolana
+  backend.PrepareSwapRequest:
+    properties:
+      best_quotes_index:
+        type: integer
+      quote_id:
+        type: string
+    required:
+    - best_quotes_index
+    - quote_id
+    type: object
+  backend.PrepareSwapResponse:
+    properties:
+      actions:
+        items:
+          $ref: '#/definitions/backend.Action'
+        type: array
+      swap_id:
+        type: string
+    type: object
+  backend.Quote:
+    properties:
+      chain_id:
+        type: string
+      chain_type:
+        $ref: '#/definitions/backend.ChainType'
+      fees:
+        type: string
+      from_amount:
+        type: string
+      from_token:
+        type: string
+      gas_estimate:
+        type: string
+      provider:
+        type: string
+      raw:
+        description: Raw provider response
+        type: string
+      router:
+        description: 'EVM only: swap router'
+        type: string
+      spender:
+        description: 'EVM only: approval spender'
+        type: string
+      to_amount:
+        type: string
+      to_token:
+        type: string
+    type: object
+  backend.QuoteRequest:
+    properties:
+      amount:
+        type: string
+      from_chain_id:
+        type: string
+      from_token:
+        type: string
+      slippage_bps:
+        maximum: 10000
+        minimum: 0
+        type: number
+      to_chain_id:
+        type: string
+      to_token:
+        type: string
+      user_address:
+        type: string
+      wallet_uuid:
+        description: 'Optional: wallet UUID for tracking'
+        type: string
+    required:
+    - amount
+    - from_chain_id
+    - from_token
+    - slippage_bps
+    - to_chain_id
+    - to_token
+    type: object
+  backend.QuoteResponse:
+    properties:
+      best_quotes:
+        items:
+          $ref: '#/definitions/backend.Quote'
+        type: array
+      expires_at:
+        type: string
+      quote_id:
+        type: string
+      user_address:
+        type: string
+      wallet_uuid:
+        type: string
+    type: object
+  backend.SigningPayload:
+    properties:
+      chain_id:
+        type: string
+      data:
+        type: string
+      gas:
+        type: string
+      serialized_tx:
+        description: Solana fields
+        type: string
+      to:
+        description: EVM fields
+        type: string
+      value:
+        type: string
+    type: object
+  backend.Step:
+    properties:
+      action_type:
+        $ref: '#/definitions/backend.ActionType'
+      confirmed_at:
+        type: string
+      expected_chain_id:
+        description: 用 string 存更通用
+        type: string
+      expected_data_hash:
+        description: 0x...
+        type: string
+      expected_to:
+        type: string
+      expected_value:
+        description: wei，十进制或 hex 统一一种
+        type: string
+      fail_message:
+        type: string
+      fail_reason_code:
+        type: string
+      idempotency_key:
+        type: string
+      status:
+        description: 0=CREATED, 1=PENDING, 2=FAILED, 3=SUCCESS
+        type: integer
+      step_index:
+        type: integer
+      submitted_at:
+        type: string
+      tx_hash:
+        type: string
+    type: object
+  backend.SubmitSignedTxRequest:
+    properties:
+      idempotency_key:
+        type: string
+      signed_tx:
+        type: string
+      step_index:
+        minimum: 0
+        type: integer
+      swap_id:
+        type: string
+    required:
+    - idempotency_key
+    - signed_tx
+    - step_index
+    - swap_id
+    type: object
+  backend.SubmitSignedTxResponse:
+    properties:
+      tx_hash:
+        type: string
+    type: object
+  backend.SubmitTxHashRequest:
+    properties:
+      idempotency_key:
+        type: string
+      step_index:
+        minimum: 0
+        type: integer
+      swap_id:
+        type: string
+      tx_hash:
+        type: string
+    required:
+    - idempotency_key
+    - swap_id
+    - tx_hash
+    type: object
+  backend.SubmitTxHashResponse:
+    properties:
+      tx_hash:
+        type: string
+    type: object
+  backend.SwapStatusResponse:
+    properties:
+      fail_message:
+        type: string
+      fail_reason_code:
+        type: string
+      status:
+        description: 0=CREATED, 1=PENDING, 2=FAILED, 3=SUCCESS
+        type: integer
+      steps:
+        items:
+          $ref: '#/definitions/backend.Step'
+        type: array
+      swap_id:
+        type: string
+    type: object
+  models.GenerateTOTPRequest:
+    properties:
+      user_id:
+        type: string
+    required:
+    - user_id
+    type: object
+  models.GenerateTOTPResponse:
+    properties:
+      current_code:
+        type: string
+      message:
+        type: string
+      qr_code_image:
+        type: string
+      qr_code_url:
+        type: string
+      remaining_time:
+        type: integer
+      secret:
+        type: string
+    type: object
+  models.VerifyTOTPRequest:
+    properties:
+      code:
+        type: string
+      secret:
+        type: string
+    required:
+    - code
+    - secret
+    type: object
+  models.VerifyTOTPResponse:
+    properties:
+      message:
+        type: string
+      remaining_time:
+        type: integer
+      valid:
+        type: boolean
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Swagger UI for API testing
+  title: Wallet Service API
+  version: "1.0"
+paths:
+  /aggregator/quotes:
+    post:
+      consumes:
+      - application/json
+      description: 并发调用所有可用 provider，返回最佳报价及候选列表
+      parameters:
+      - description: 报价请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/backend.QuoteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/backend.QuoteResponse'
+        "400":
+          description: invalid request body
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: 获取聚合报价
+      tags:
+      - Aggregator
+  /aggregator/swap/prepare:
+    post:
+      consumes:
+      - application/json
+      description: 根据报价 ID 和用户地址生成签名动作链路
+      parameters:
+      - description: prepare 请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/backend.PrepareSwapRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/backend.PrepareSwapResponse'
+        "400":
+          description: invalid request body
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: 生成 swap 执行计划
+      tags:
+      - Aggregator
+  /aggregator/swap/status:
+    get:
+      description: 根据 swapId 返回各步骤最新状态，并在需要时刷新链上信息
+      parameters:
+      - description: Swap ID
+        in: query
+        name: swapId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/backend.SwapStatusResponse'
+        "400":
+          description: swapId is required
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: 查询 swap 状态
+      tags:
+      - Aggregator
+  /aggregator/swap/submit_tx_hash:
+    post:
+      consumes:
+      - application/json
+      description: 用户使用前端钱包（如 MetaMask）自行广播交易后，将 txHash 回传给后端。后端记录 swap step 的 txHash
+        并将状态置为 PENDING，后续可通过 GetSwapStatus/worker 跟踪链上结果。
+      parameters:
+      - description: 提交交易哈希请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/backend.SubmitTxHashRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/backend.SubmitTxHashResponse'
+        "400":
+          description: invalid request body
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: 提交交易哈希（前端钱包已广播）
+      tags:
+      - Aggregator
+  /aggregator/tx/submitSigned:
+    post:
+      consumes:
+      - application/json
+      description: 接收客户端签名后的原始交易并广播，同时更新步骤状态
+      parameters:
+      - description: 签名交易请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/backend.SubmitSignedTxRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/backend.SubmitSignedTxResponse'
+        "400":
+          description: invalid request body
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: 提交签名交易
+      tags:
+      - Aggregator
+  /authenticator/generate:
+    post:
+      consumes:
+      - application/json
+      description: 生成60秒周期的TOTP密钥
+      parameters:
+      - description: 生成TOTP请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.GenerateTOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 生成成功
+          schema:
+            $ref: '#/definitions/models.GenerateTOTPResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            type: string
+        "500":
+          description: 服务器内部错误
+          schema:
+            type: string
+      summary: 生成TOTP密钥
+      tags:
+      - 身份认证
+  /authenticator/verify:
+    post:
+      consumes:
+      - application/json
+      description: 验证60秒周期的TOTP验证码
+      parameters:
+      - description: 验证TOTP请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.VerifyTOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 验证成功
+          schema:
+            $ref: '#/definitions/models.VerifyTOTPResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            type: string
+        "500":
+          description: 服务器内部错误
+          schema:
+            type: string
+      summary: 验证TOTP代码
+      tags:
+      - 身份认证
+swagger: "2.0"
