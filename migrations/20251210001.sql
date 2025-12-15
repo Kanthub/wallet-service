@@ -36,16 +36,16 @@ CREATE INDEX idx_syslog_order_number ON sys_log (order_number);
 
 create table if not exists auth (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    auth_name    VARCHAR(255) DEFAULT '' COMMENT '权限名称',
-    auth_url     VARCHAR(255) DEFAULT '' COMMENT '权限路径/接口地址',
-    user_id      INT DEFAULT 0 COMMENT '所属用户/管理员ID',
-    pid          INT DEFAULT 0 COMMENT '父级权限ID',
-    sort         INT DEFAULT 0 COMMENT '排序',
-    icon         VARCHAR(255) DEFAULT '' COMMENT '图标',
-    is_show      INT DEFAULT 1 COMMENT '是否显示(1显示;0隐藏)',
-    status       INT DEFAULT 1 COMMENT '状态(1启用;0禁用)',
-    create_id    INT DEFAULT 0 COMMENT '创建人ID',
-    update_id    INT DEFAULT 0 COMMENT '修改人ID',
+    auth_name    VARCHAR(255) DEFAULT '', -- 权限名称
+    auth_url     VARCHAR(255) DEFAULT '', -- 权限路径/接口地址
+    user_id      INT DEFAULT 0, -- 所属用户/管理员ID
+    pid          INT DEFAULT 0, -- 父级权限ID
+    sort         INT DEFAULT 0, -- 排序
+    icon         VARCHAR(255) DEFAULT '', -- 图标
+    is_show      INT DEFAULT 1, -- 是否显示(1显示;0隐藏)
+    status       INT DEFAULT 1, -- 状态(1启用;0禁用)
+    create_id    INT DEFAULT 0, -- 创建人ID
+    update_id    INT DEFAULT 0, -- 修改人ID
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,11 +57,11 @@ CREATE INDEX idx_auth_update_id ON auth (update_id);
 
 create table if not exists role (
     guid         TEXT PRIMARY KEY DEFAULT replace(uuid_generate_v4()::text, '-', ''),
-    role_name    VARCHAR(100) DEFAULT '' COMMENT '角色名称',
-    detail       VARCHAR(255) DEFAULT '' COMMENT '角色描述/说明',
-    status       INT DEFAULT 1 COMMENT '状态(1启用;0禁用)',
-    create_id    INT DEFAULT 0 COMMENT '创建人ID',
-    update_id    INT DEFAULT 0 COMMENT '修改人ID',
+    role_name    VARCHAR(100) DEFAULT '', -- 角色名称
+    detail       VARCHAR(255) DEFAULT '', -- 角色描述/说明
+    status       INT DEFAULT 1, -- 状态(1启用;0禁用)
+    create_id    INT DEFAULT 0, -- 创建人ID
+    update_id    INT DEFAULT 0, -- 修改人ID
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -235,7 +235,7 @@ CREATE TABLE if not exists wallet_tx_record (
     to_address       VARCHAR(70) NOT NULL,
     amount           NUMERIC(78,0) NOT NULL CHECK (amount >= 0),
     memo             VARCHAR(500) NOT NULL,
-    hash             VARCHAR(500) DEFAULT '',
+    tx_id            VARCHAR(500) DEFAULT '',
     block_height     VARCHAR(500) DEFAULT '',
     tx_type          VARCHAR(50) DEFAULT 'transfer',    -- 交易类型：approve, swap, bridge, wrap, unwrap, transfer
     status           INTEGER DEFAULT 0,                 -- 交易状态：0=CREATED, 1=PENDING, 2=FAILED, 3=SUCCESS
@@ -254,7 +254,7 @@ CREATE INDEX idx_wallet_tx_record_from_address ON wallet_tx_record (from_address
 CREATE INDEX idx_wallet_tx_record_to_address ON wallet_tx_record (to_address);
 CREATE INDEX idx_wallet_tx_record_tx_type ON wallet_tx_record (tx_type);
 CREATE INDEX idx_wallet_tx_record_status_last_checked ON wallet_tx_record (status, last_checked_at);
-CREATE INDEX idx_wallet_tx_record_hash ON wallet_tx_record (hash);
+CREATE INDEX idx_wallet_tx_record_tx_id ON wallet_tx_record (tx_id);
 ALTER TABLE wallet_tx_record DROP COLUMN IF EXISTS explorer_url;
 
 
@@ -296,7 +296,7 @@ CREATE TABLE if not exists market_price (
     usd_price    NUMERIC(20, 8) NOT NULL,
     market_cap   NUMERIC(20, 2) CHECK (market_cap >= 0),      -- 市值（美元）
     liquidity    NUMERIC(20, 2) CHECK (liquidity >= 0),       -- 流动性（美元）
-    24h_volume   NUMERIC(20, 2) CHECK (24h_volume >= 0),      -- 24小时成交量（美元）
+    volume_24h   NUMERIC(20, 2) CHECK (volume_24h >= 0),      -- 24小时成交量（美元）
     price_change VARCHAR(255) NOT NULL,
     ranking      VARCHAR(255) NOT NULL,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

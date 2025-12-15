@@ -1,6 +1,7 @@
 package lifi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/utils"
 	"github.com/roothash-pay/wallet-services/services/api/models/backend"
@@ -22,8 +25,8 @@ type Provider struct {
 	evmCaller  *utils.EVMCaller
 }
 
-// QuoteResponse represents the response from LiFi quote API
-type QuoteResponse struct {
+// LifiQuoteResponse represents the response from LiFi quote API
+type LifiQuoteResponse struct {
 	Type   string `json:"type"`
 	ID     string `json:"id"`
 	Tool   string `json:"tool"`
@@ -42,9 +45,9 @@ type QuoteResponse struct {
 			Decimals int    `json:"decimals"`
 			ChainID  int    `json:"chainId"`
 		} `json:"toToken"`
-		FromAmount string `json:"fromAmount"`
-		ToAmount   string `json:"toAmount"`
-		Slippage   string `json:"slippage"`
+		FromAmount string  `json:"fromAmount"`
+		ToAmount   string  `json:"toAmount"`
+		Slippage   float64 `json:"slippage"`
 	} `json:"action"`
 	Estimate struct {
 		FromAmount        string `json:"fromAmount"`
@@ -97,17 +100,102 @@ func (p *Provider) SupportedChainType() backend.ChainType {
 	return backend.ChainTypeEVM
 }
 
-// buildQuoteURL constructs the LiFi quote API URL with query parameters
-func (p *Provider) buildQuoteURL(req *backend.QuoteRequest) (string, error) {
+// 获取报价
+func (p *Provider) GetQuote(ctx context.Context, req *backend.QuoteRequest) (*backend.Quote, error) {
+	lifiResp, err := p.fetchQuote(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to internal Quote format
+	quote := p.convertToQuote(req, lifiResp)
+
+	log.Info("LiFi GetQuote success",
+		"fromToken", req.FromToken,
+		"toToken", req.ToToken,
+		"fromAmount", req.Amount,
+		"toAmount", quote.ToAmount,
+	)
+
+	return quote, nil
+}
+
+// 把报价转为标准形式
+// 把报价转为标准形式
+func (p *Provider) convertToQuote(req *backend.QuoteRequest, resp *LifiQuoteResponse) *backend.Quote {
+	// check chain type
+	if req.FromChainID == "solana" || req.FromChainID == "solana-mainnet" || req.FromChainID == "solana-devnet" {
+		return p.convertToQuoteSolana(req, resp)
+	}
+
+	quote := p.convertToQuoteEVM(req, resp)
+	return quote
+}
+
+// 构建 swap actions
+func (p *Provider) BuildSwap(ctx context.Context, quote *backend.Quote, userAddress string) (*backend.BuildSwapResponse, error) {
+	// check chain type
+	if quote.ChainID == "solana" || quote.ChainID == "solana-mainnet" || quote.ChainID == "solana-devnet" {
+		return p.buildSwapSolana(ctx, quote, userAddress)
+	}
+
+	swapActions, err := p.buildSwapEVM(ctx, quote, userAddress)
+	if err != nil {
+		return nil, err
+	}
+	return swapActions, nil
+}
+
+// buildQuoteRequest 构建请求URL和请求体
+// 跨链：返回 /advanced/routes URL + JSON请求体
+// 同链：返回 /quote URL + nil请求体（GET参数）
+func (p *Provider) buildQuoteRequest(req *backend.QuoteRequest) (reqURL string, reqBody []byte, err error) {
 	baseURL := p.apiURL
 	if baseURL == "" {
 		baseURL = "https://li.quest/v1"
 	}
 
-	// Parse base URL
+	// 若跨链：使用 advanced/routes（POST + JSON体）
+	if req.FromChainID != req.ToChainID {
+		reqURL = baseURL + "/advanced/routes"
+
+		// 滑点转换（bps转小数，保留4位）
+		slippageDecimal := float64(req.SlippageBps) / 10000.0
+		//slippageStr := strconv.FormatFloat(slippageDecimal, 'f', 4, 64)
+
+		// 构建跨链请求体
+		routesReq := backend.RoutesRequest{
+			FromChainId:      req.FromChainID,
+			FromAmount:       req.Amount,
+			FromTokenAddress: req.FromToken,
+			ToChainId:        req.ToChainID,
+			ToTokenAddress:   req.ToToken,
+			FromAddress:      req.UserAddress,
+			Slippage:         slippageDecimal,
+			Options: backend.RoutesRequestOptions{
+				Bridges: backend.RoutesAllowList{
+					Allow: []string{"all"},
+				},
+				Exchanges: backend.RoutesAllowList{
+					Allow: []string{"all"},
+				},
+				AllowSwitchChain:     false,
+				AllowDestinationCall: true,
+			},
+		}
+
+		// 序列化JSON
+		reqBody, err = json.Marshal(routesReq)
+		if err != nil {
+			return "", nil, fmt.Errorf("marshal routes request failed: %w", err)
+		}
+		return reqURL, reqBody, nil
+	}
+
+	// 若同链：使用 quote（GET + URL参数）
 	u, err := url.Parse(baseURL + "/quote")
 	if err != nil {
-		return "", fmt.Errorf("invalid base URL: %w", err)
+		return "", nil, fmt.Errorf("invalid quote URL: %w", err)
 	}
 
 	// Build query parameters
@@ -128,19 +216,26 @@ func (p *Provider) buildQuoteURL(req *backend.QuoteRequest) (string, error) {
 	}
 
 	u.RawQuery = q.Encode()
-	return u.String(), nil
+	return u.String(), nil, nil
 }
 
 // fetchQuote makes HTTP request to LiFi API
-func (p *Provider) fetchQuote(ctx context.Context, req *backend.QuoteRequest) (*QuoteResponse, error) {
-	// Build request URL
-	quoteURL, err := p.buildQuoteURL(req)
+func (p *Provider) fetchQuote(ctx context.Context, req *backend.QuoteRequest) (*LifiQuoteResponse, error) {
+	// 构建请求URL和请求体
+	reqURL, reqBody, err := p.buildQuoteRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build quote URL: %w", err)
+		return nil, fmt.Errorf("failed to build quote request: %w", err)
 	}
 
-	// Create HTTP request
-	httpReq, err := http.NewRequestWithContext(ctx, "GET", quoteURL, nil)
+	// 创建HTTP请求（区分跨链POST/同链GET）
+	var httpReq *http.Request
+	if req.FromChainID != req.ToChainID {
+		// 跨链：POST请求
+		httpReq, err = http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewBuffer(reqBody))
+	} else {
+		// 同链：GET请求
+		httpReq, err = http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -170,9 +265,9 @@ func (p *Provider) fetchQuote(ctx context.Context, req *backend.QuoteRequest) (*
 	}
 
 	// Parse response
-	var lifiResp QuoteResponse
+	var lifiResp LifiQuoteResponse
 	if err := json.Unmarshal(body, &lifiResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, fmt.Errorf("failed to parse response: %w, body: %s", err, string(body))
 	}
 
 	return &lifiResp, nil

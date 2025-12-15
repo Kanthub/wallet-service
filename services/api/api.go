@@ -24,6 +24,9 @@ import (
 	"github.com/roothash-pay/wallet-services/services/api/routes"
 	"github.com/roothash-pay/wallet-services/services/api/service"
 	common2 "github.com/roothash-pay/wallet-services/services/common"
+
+	_ "github.com/roothash-pay/wallet-services/docs"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 const (
@@ -156,6 +159,8 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 
 	apiRouter.Use(middleware.Heartbeat(HealthPath))
 
+	apiRouter.Get("/swagger/*", httpSwagger.WrapHandler)
+
 	apiRouter.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		log.Warn("NotFoundHandler hit", "path", r.URL.Path, "method", r.Method)
 		http.Error(w, "route not found", http.StatusNotFound)
@@ -197,7 +202,6 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 	h.KlineApi()
 	h.NewsletterCatApi()
 	h.NewsletterApi()
-	h.WalletBalanceApi()
 
 	a.router = apiRouter
 }

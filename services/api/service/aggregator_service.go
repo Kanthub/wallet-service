@@ -12,14 +12,18 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/roothash-pay/wallet-services/common/redis"
 	"github.com/roothash-pay/wallet-services/config"
 	"github.com/roothash-pay/wallet-services/database"
 	dbBackend "github.com/roothash-pay/wallet-services/database/backend"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider"
-	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/inch"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/jupiter"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/lifi"
+	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/oneinch"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/provider/zerox"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/store"
 	"github.com/roothash-pay/wallet-services/services/api/aggregator/utils"
@@ -67,7 +71,7 @@ func InitAggregatorService(db *database.DB, cfg *config.Config) (*AggregatorServ
 
 	// Initialize 1inch provider if enabled
 	if cfg.AggregatorConfig.EnableProviders["1inch"] && cfg.AggregatorConfig.OneInchAPIURL != "" {
-		oneInchProvider := inch.NewProvider(cfg.AggregatorConfig.OneInchAPIURL, cfg.AggregatorConfig.OneInchAPIKey)
+		oneInchProvider := oneinch.NewProvider(cfg.AggregatorConfig.OneInchAPIURL, cfg.AggregatorConfig.OneInchAPIKey)
 		providers = append(providers, oneInchProvider)
 		log.Info("1inch provider initialized", "url", cfg.AggregatorConfig.OneInchAPIURL)
 	}
@@ -211,22 +215,29 @@ func (s *AggregatorService) GetQuotes(ctx context.Context, req *backend.QuoteReq
 	quoteID := uuid.New().String()
 	expiresAt := time.Now().Add(s.quoteTTL)
 
-	bestQuote := quotes[0]
-	var alternatives []*backend.Quote
-	if len(quotes) > 1 {
-		alternatives = quotes[1:]
-	}
-
-	response := &backend.QuoteResponse{
-		QuoteID:      quoteID,
-		ExpiresAt:    expiresAt,
-		BestQuote:    bestQuote,
-		Alternatives: alternatives,
+	storeData := &backend.QuoteStore{
+		QuoteID:     quoteID,
+		UserAddress: req.UserAddress,
+		ExpiresAt:   expiresAt,
+		WalletUUID:  req.WalletUUID,
+		BestQuotes:  quotes,
 	}
 
 	//  Cache store quote snapshot
-	if err := s.quoteStore.Save(ctx, quoteID, response, s.quoteTTL); err != nil {
+	if err = s.quoteStore.Save(ctx, quoteID, storeData, s.quoteTTL); err != nil {
 		log.Error("Failed to cache quote", "err", err)
+	}
+
+	response := &backend.QuoteResponse{
+		QuoteID:     quoteID,
+		UserAddress: req.UserAddress,
+		ExpiresAt:   expiresAt,
+		WalletUUID:  req.WalletUUID,
+		BestQuotes:  quotes,
+	}
+
+	for _, v := range response.BestQuotes {
+		v.Raw = ""
 	}
 
 	return response, nil
@@ -267,17 +278,24 @@ func (s *AggregatorService) aggregateQuotes(ctx context.Context, req *backend.Qu
 // 前端获取报价后，用户接受该报价点击 swap，执行该方法
 // 返回一个动作链路，让用户执行相关签名
 // PrepareSwap generates a transaction plan for a swap
-func (s *AggregatorService) PrepareSwap(ctx context.Context, req *backend.PrepareSwapRequest) (*backend.PrepareSwapResponse, error) {
+func (s *AggregatorService) PrepareSwap(ctx context.Context, quoteID string, bestQuotesIndex int) (*backend.PrepareSwapResponse, error) {
 	// Validate quote
-	quoteResp, err := s.quoteStore.Get(ctx, req.QuoteID)
+	cachedQuote, err := s.quoteStore.Get(ctx, quoteID)
 	if err != nil {
 		return nil, fmt.Errorf("quote not found or expired: %w", err)
 	}
-	if time.Now().After(quoteResp.ExpiresAt) {
+	if time.Now().After(cachedQuote.ExpiresAt) {
 		return nil, fmt.Errorf("quote expired")
 	}
 
-	bestQuote := quoteResp.BestQuote
+	// 更新缓存
+	cachedQuote.BestQuotesIndex = bestQuotesIndex
+	err = s.quoteStore.Update(ctx, quoteID, cachedQuote, s.quoteTTL)
+	if err != nil {
+		return nil, fmt.Errorf("fail to update cache")
+	}
+
+	quote := cachedQuote.BestQuotes[bestQuotesIndex]
 
 	// Generate swap ID
 	swapID := uuid.New().String()
@@ -285,17 +303,17 @@ func (s *AggregatorService) PrepareSwap(ctx context.Context, req *backend.Prepar
 	// Find provider
 	var selectedProvider provider.Provider
 	for _, p := range s.providers {
-		if p.Name() == bestQuote.Provider {
+		if p.Name() == quote.Provider {
 			selectedProvider = p
 			break
 		}
 	}
 	if selectedProvider == nil {
-		return nil, fmt.Errorf("provider not found: %s", bestQuote.Provider)
+		return nil, fmt.Errorf("provider not found: %s", quote.Provider)
 	}
 
 	// build swap tx
-	buildResp, err := selectedProvider.BuildSwap(ctx, bestQuote, req.UserAddress)
+	buildResp, err := selectedProvider.BuildSwap(ctx, quote, cachedQuote.UserAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap: %w", err)
 	}
@@ -305,9 +323,9 @@ func (s *AggregatorService) PrepareSwap(ctx context.Context, req *backend.Prepar
 	// Create swap record
 	swap := &backend.Swap{
 		SwapID:      swapID,
-		QuoteID:     req.QuoteID,
-		UserAddress: req.UserAddress,
-		WalletUUID:  req.WalletUUID,
+		QuoteID:     cachedQuote.QuoteID,
+		UserAddress: cachedQuote.UserAddress,
+		WalletUUID:  cachedQuote.WalletUUID,
 		Status:      backend.TxStatusCreated, // 0 = CREATED
 		Steps:       make([]*backend.Step, len(actions)),
 	}
@@ -319,9 +337,13 @@ func (s *AggregatorService) PrepareSwap(ctx context.Context, req *backend.Prepar
 			ActionType: action.ActionType,
 			Status:     backend.TxStatusCreated, // 0 = CREATED
 		}
+
+		if err = fillExpectedFromSigningPayload(swap.Steps[i], action.SigningPayload); err != nil {
+			return nil, fmt.Errorf("failed to build expected tx snapshot (step %d): %w", i, err)
+		}
 	}
 
-	if err := s.swapStore.CreateSwap(ctx, swap); err != nil {
+	if err = s.swapStore.CreateSwap(ctx, swap); err != nil {
 		return nil, err
 	}
 
@@ -352,20 +374,20 @@ func (s *AggregatorService) SubmitSignedTx(ctx context.Context, req *backend.Sub
 
 	step := swap.Steps[req.StepIndex]
 
-	// TODO: Validate signed transaction against quote snapshot
-	// - Check chainId
-	// - Check router/spender whitelist
-	// - Check value limits
-
 	// Get quote for chain info
 	quoteResp, err := s.quoteStore.Get(ctx, swap.QuoteID)
 	if err != nil {
 		return nil, fmt.Errorf("quote not found: %w", err)
 	}
-	quote := quoteResp.BestQuote
+	quote := quoteResp.BestQuotes[quoteResp.BestQuotesIndex]
 	chainInfo, err := s.getChainInfo(ctx, quote.ChainID)
 	if err != nil {
 		return nil, err
+	}
+
+	// 防止滥用接口，只广播来自 prepare 的交易
+	if err = validateSignedTxAgainstStepExpected(req.SignedTx, step); err != nil {
+		return nil, fmt.Errorf("signed tx validation failed: %w", err)
 	}
 
 	// 1: Save to database with CREATED status (before broadcast)
@@ -423,6 +445,250 @@ func (s *AggregatorService) SubmitSignedTx(ctx context.Context, req *backend.Sub
 	return &backend.SubmitSignedTxResponse{TxHash: txHash}, nil
 }
 
+func normalizeValue(value string) (string, error) {
+	if value == "" {
+		return "0", nil
+	}
+	if strings.HasPrefix(value, "0x") || strings.HasPrefix(value, "0X") {
+		v, err := hexutil.DecodeBig(value)
+		if err != nil {
+			return "", err
+		}
+		return v.String(), nil
+	}
+	// assume decimal string
+	v := new(big.Int)
+	if _, ok := v.SetString(value, 10); !ok {
+		return "", fmt.Errorf("invalid value: %s", value)
+	}
+	return v.String(), nil
+}
+
+func fillExpectedFromSigningPayload(step *backend.Step, sp *backend.SigningPayload) error {
+	if sp == nil {
+		return nil
+	}
+	// 只对 EVM tx 做 expected（Solana 走 SerializedTx 另外处理）
+	if sp.To == "" || sp.Data == "" || sp.ChainID == "" {
+		return nil
+	}
+
+	dataBytes, err := hexutil.Decode(sp.Data)
+	if err != nil {
+		return fmt.Errorf("invalid signing payload data: %w", err)
+	}
+
+	value, err := normalizeValue(sp.Value)
+	if err != nil {
+		return fmt.Errorf("invalid signing payload value: %w", err)
+	}
+
+	step.ExpectedChainID = sp.ChainID
+	step.ExpectedTo = strings.ToLower(sp.To)
+	step.ExpectedValueWei = value
+	step.ExpectedDataHash = crypto.Keccak256Hash(dataBytes).Hex()
+	return nil
+}
+
+func validateSignedTxAgainstStepExpected(signedTxHex string, step *backend.Step) error {
+	if step.ExpectedTo == "" || step.ExpectedDataHash == "" || step.ExpectedChainID == "" {
+		return fmt.Errorf("missing expected tx snapshot in step")
+	}
+
+	rawBytes, err := hexutil.Decode(signedTxHex)
+	if err != nil {
+		return fmt.Errorf("invalid signedTx hex: %w", err)
+	}
+
+	var tx types.Transaction
+	if err = tx.UnmarshalBinary(rawBytes); err != nil {
+		return fmt.Errorf("failed to decode signed tx: %w", err)
+	}
+
+	// chainId
+	expChainID, ok := new(big.Int).SetString(step.ExpectedChainID, 10)
+	if !ok {
+		return fmt.Errorf("invalid expected chainId: %s", step.ExpectedChainID)
+	}
+	if tx.ChainId() == nil || tx.ChainId().Cmp(expChainID) != 0 {
+		return fmt.Errorf("chainId mismatch: got %v want %v", tx.ChainId(), expChainID)
+	}
+
+	// to
+	if tx.To() == nil {
+		return fmt.Errorf("contract creation not allowed")
+	}
+	if strings.ToLower(tx.To().Hex()) != strings.ToLower(step.ExpectedTo) {
+		return fmt.Errorf("to mismatch: got %s want %s", tx.To().Hex(), step.ExpectedTo)
+	}
+
+	// value（你需要统一 step.ExpectedValueWei 的格式）
+	expValue, ok := new(big.Int).SetString(step.ExpectedValueWei, 10)
+	if !ok {
+		return fmt.Errorf("invalid expected value: %s", step.ExpectedValueWei)
+	}
+	if tx.Value() == nil || tx.Value().Cmp(expValue) != 0 {
+		return fmt.Errorf("value mismatch: got %s want %s", tx.Value(), expValue)
+	}
+
+	// data hash
+	gotHash := crypto.Keccak256Hash(tx.Data()).Hex()
+	if strings.ToLower(gotHash) != strings.ToLower(step.ExpectedDataHash) {
+		return fmt.Errorf("data mismatch: got %s want %s", gotHash, step.ExpectedDataHash)
+	}
+
+	return nil
+}
+
+func (s *AggregatorService) SubmitTxHash(ctx context.Context, req *backend.SubmitTxHashRequest) (*backend.SubmitTxHashResponse, error) {
+	// 1) 幂等
+	if txHash, exists := s.swapStore.CheckIdempotency(ctx, req.SwapID, req.StepIndex, req.IdempotencyKey); exists {
+		return &backend.SubmitTxHashResponse{TxHash: txHash}, nil
+	}
+
+	// 2) 获取 swap & step
+	swap, err := s.swapStore.GetSwap(ctx, req.SwapID)
+	if err != nil {
+		return nil, err
+	}
+	if req.StepIndex < 0 || req.StepIndex >= len(swap.Steps) {
+		return nil, fmt.Errorf("invalid step index: %d", req.StepIndex)
+	}
+	step := swap.Steps[req.StepIndex]
+
+	// 3) 可选但强烈建议：链上回查交易内容，校验符合 step.Expected*
+	//    （防止有人随便塞个 txHash 进来污染状态/对账）
+	// 需要 chainInfo + accountClient.GetTxByHash 能返回 to/value/data 或至少 dataHash
+	if err = s.validateTxHashAgainstStep(ctx, swap, step, req.TxHash); err != nil {
+		return nil, fmt.Errorf("tx hash validation failed: %w", err)
+	}
+
+	// 4) 更新 step
+	now := time.Now()
+	step.TxHash = req.TxHash
+	step.Status = backend.TxStatusPending
+	step.SubmittedAt = &now
+	step.IdempotencyKey = req.IdempotencyKey
+	_ = s.swapStore.UpdateStep(ctx, req.SwapID, req.StepIndex, step)
+
+	// 5) 更新 swap
+	swap.Status = backend.TxStatusPending
+	_ = s.swapStore.UpdateSwap(ctx, swap)
+
+	// 6) 记录幂等
+	_ = s.swapStore.RecordIdempotency(ctx, req.SwapID, req.StepIndex, req.IdempotencyKey, req.TxHash)
+
+	// 7) 可选：写 wallet_tx_record（CREATED/PENDING）让 worker 接管后续状态
+	// recordGuid := s.saveStepTxStatusCreated(...)
+	// s.updateStepTxStatusPending(..., req.TxHash)
+
+	return &backend.SubmitTxHashResponse{TxHash: req.TxHash}, nil
+}
+
+// validateTxHashAgainstStep: 用 txHash 回查链上交易并校验它属于该 step（在没有 input/data 的情况下是“半严格校验”）
+func (s *AggregatorService) validateTxHashAgainstStep(
+	ctx context.Context,
+	swap *backend.Swap,
+	step *backend.Step,
+	txHash string,
+) error {
+	quoteResp, err := s.quoteStore.Get(ctx, swap.QuoteID)
+	if err != nil {
+		return fmt.Errorf("quote not found: %w", err)
+	}
+	quote := quoteResp.BestQuotes[quoteResp.BestQuotesIndex]
+
+	if swap == nil || step == nil || quote == nil {
+		return fmt.Errorf("nil swap/step/quote")
+	}
+	if txHash == "" {
+		return fmt.Errorf("empty txHash")
+	}
+
+	// Step expected 必须存在（至少 to/value/chain）
+	if step.ExpectedTo == "" || step.ExpectedChainID == "" || step.ExpectedValueWei == "" {
+		return fmt.Errorf("missing expected snapshot in step")
+	}
+
+	// 1) 先检查链是否一致（我们是用 quote.ChainID 去查链的）
+	//    这里的意义：防止 step.expectedChainId 写错 / quote 被串
+	if quote.ChainID != step.ExpectedChainID {
+		return fmt.Errorf("chainId mismatch: quote %s vs step expected %s", quote.ChainID, step.ExpectedChainID)
+	}
+
+	chainInfo, err := s.getChainInfo(ctx, quote.ChainID)
+	if err != nil {
+		return fmt.Errorf("chain info not found: %w", err)
+	}
+
+	txInfo, err := s.accountClient.GetTxByHash(
+		ctx,
+		chainInfo.ConsumerToken,
+		chainInfo.WalletChain,
+		chainInfo.WalletCoin,
+		chainInfo.WalletNetwork,
+		txHash,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get tx by hash: %w", err)
+	}
+	if txInfo == nil {
+		return fmt.Errorf("tx not found: %s", txHash)
+	}
+
+	// 2) from 必须是 swap.UserAddress（关键：防别人塞入任意 txHash 污染你的 swap）
+	if swap.UserAddress != "" && !addrEq(txInfo.From, swap.UserAddress) {
+		return fmt.Errorf("from mismatch: got %s want %s", txInfo.From, swap.UserAddress)
+	}
+
+	// 3) to 必须匹配 expected
+	if !addrEq(txInfo.To, step.ExpectedTo) {
+		return fmt.Errorf("to mismatch: got %s want %s", txInfo.To, step.ExpectedTo)
+	}
+
+	// 4) value 必须匹配 expected（统一成 wei 十进制）
+	gotValueWei, err := normalizeWeiString(txInfo.Value) // 允许 "0x0" 或 "0"
+	if err != nil {
+		return fmt.Errorf("invalid tx value: %w", err)
+	}
+	expValueWei, ok := new(big.Int).SetString(step.ExpectedValueWei, 10)
+	if !ok {
+		return fmt.Errorf("invalid expected value in step: %s", step.ExpectedValueWei)
+	}
+	if gotValueWei.Cmp(expValueWei) != 0 {
+		return fmt.Errorf("value mismatch: got %s want %s", gotValueWei.String(), expValueWei.String())
+	}
+
+	// 5) dataHash：当前 txInfo 没有 input/data，无法校验
+	//    你可以在这里选择：
+	//    - 直接放行（半严格）
+	//    - 或者如果 step.ExpectedDataHash 不为空就拒绝（强制要求服务返回 input）
+	if step.ExpectedDataHash != "" {
+		return fmt.Errorf("cannot validate tx input/data hash: account GetTxByHash does not return calldata")
+	}
+
+	return nil
+}
+
+func addrEq(a, b string) bool {
+	return strings.ToLower(strings.TrimSpace(a)) == strings.ToLower(strings.TrimSpace(b))
+}
+
+func normalizeWeiString(v string) (*big.Int, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return big.NewInt(0), nil
+	}
+	if strings.HasPrefix(v, "0x") || strings.HasPrefix(v, "0X") {
+		return hexutil.DecodeBig(v)
+	}
+	bi := new(big.Int)
+	if _, ok := bi.SetString(v, 10); !ok {
+		return nil, fmt.Errorf("invalid decimal: %s", v)
+	}
+	return bi, nil
+}
+
 // GetSwapStatus retrieves the status of a swap
 // 主动更新状态
 func (s *AggregatorService) GetSwapStatus(ctx context.Context, swapID string) (*backend.SwapStatusResponse, error) {
@@ -432,11 +698,11 @@ func (s *AggregatorService) GetSwapStatus(ctx context.Context, swapID string) (*
 	}
 
 	var statusChainInfo *chaininfo.Info
-	if quoteResp, err := s.quoteStore.Get(ctx, swap.QuoteID); err == nil && quoteResp != nil && quoteResp.BestQuote != nil {
-		if info, err := s.getChainInfo(ctx, quoteResp.BestQuote.ChainID); err == nil {
+	if quoteResp, err := s.quoteStore.Get(ctx, swap.QuoteID); err == nil && quoteResp != nil && quoteResp.BestQuotes[0] != nil {
+		if info, err := s.getChainInfo(ctx, quoteResp.BestQuotes[0].ChainID); err == nil {
 			statusChainInfo = info
 		} else {
-			log.Warn("Chain settings missing for swap, skip status refresh", "swapID", swapID, "chainID", quoteResp.BestQuote.ChainID, "err", err)
+			log.Warn("Chain settings missing for swap, skip status refresh", "swapID", swapID, "chainID", quoteResp.BestQuotes[0].ChainID, "err", err)
 		}
 	} else if err != nil {
 		log.Warn("Failed to load quote for swap status refresh", "swapID", swapID, "err", err)
@@ -563,7 +829,7 @@ func (s *AggregatorService) saveStepTxStatusCreated(ctx context.Context, swap *b
 		ToAddress:   quote.Router,
 		Amount:      amount, // Store as string (supports uint256)
 		Memo:        memo,
-		Hash:        "",                        // No hash yet
+		TxID:        "",                        // No hash yet
 		BlockHeight: "",                        // Will be filled when confirmed
 		TxType:      txType,                    // Transaction type: approve, swap, bridge, wrap, unwrap
 		Status:      dbBackend.TxStatusCreated, // Status: CREATED (0)
@@ -632,7 +898,7 @@ func (s *AggregatorService) updateSwapTxStatus(ctx context.Context, swap *backen
 		return
 	}
 
-	quote := quoteResp.BestQuote
+	quote := quoteResp.BestQuotes[0]
 	var chainInfoForSwap *chaininfo.Info
 	if info, err := s.getChainInfo(ctx, quote.ChainID); err == nil {
 		chainInfoForSwap = info
@@ -775,6 +1041,8 @@ func (s *AggregatorService) getTokenSymbol(tokenAddress string) string {
 	}
 }
 
+// resolveTokenID returns the token table GUID for (chainID, tokenAddress).
+// If the token metadata is missing, we temporarily fall back to the raw address
 func (s *AggregatorService) resolveTokenID(ctx context.Context, chainID, tokenAddress string) string {
 	if tokenAddress == "" {
 		return ""

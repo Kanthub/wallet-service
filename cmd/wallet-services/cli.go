@@ -37,12 +37,21 @@ var (
 
 func runMigrations(ctx *cli.Context) error {
 	ctx.Context = opio.CancelOnInterrupt(ctx.Context)
-	log.Info("running migrations...")
+
+	migrationsDir := ctx.String(MigrationsFlag.Name) // == "migrations-dir"
+	log.Info("running migrations...", "migrationsDir", migrationsDir)
+
 	cfg, err := config.New(ctx.String(ConfigFlag.Name))
 	if err != nil {
 		log.Error("failed to load config", "err", err)
 		return err
 	}
+
+	// config 里没配，就用命令行的
+	if cfg.Migrations == "" {
+		cfg.Migrations = migrationsDir
+	}
+
 	db, err := database.NewDB(ctx.Context, cfg.MasterDB)
 	if err != nil {
 		log.Error("failed to connect to database", "err", err)

@@ -31,10 +31,42 @@ func NewValidator() *Validator {
 func (v *Validator) ValidateChainID(chainID string) error {
 	// TODO: Implement chain ID validation
 	supportedChains := map[string]bool{
-		"1":              true, // Ethereum Mainnet
-		"56":             true, // BSC
-		"137":            true, // Polygon
+		// Ethereum & L2s
+		"1":        true, // Ethereum Mainnet
+		"5":        true, // Goerli
+		"10":       true, // Optimism
+		"420":      true, // Optimism Goerli
+		"42161":    true, // Arbitrum One
+		"42170":    true, // Arbitrum Nova
+		"421613":   true, // Arbitrum Goerli
+		"11155111": true, // Sepolia
+		// BNB Chain
+		"56": true, // BNB Chain
+		"97": true, // BNB Testnet
+		// Polygon
+		"137":   true, // Polygon
+		"80001": true, // Polygon Mumbai
+		// Avalanche
+		"43114": true, // Avalanche C-Chain
+		"43113": true, // Avalanche Fuji
+		// Fantom
+		"250":  true, // Fantom
+		"4002": true, // Fantom Testnet
+		// zkSync
+		"324": true, // zkSync Era
+		"280": true, // zkSync Testnet
+		// Base
+		"8453":  true, // Base
+		"84531": true, // Base Goerli
+		// Linea
+		"59144": true, // Linea Mainnet
+		"59140": true, // Linea Sepolia
+		// Scroll
+		"534352": true, // Scroll
+		"534351": true, // Scroll Sepolia
+		// Misc
 		"solana-mainnet": true,
+		"solana-devnet":  true,
 	}
 
 	if !supportedChains[chainID] {

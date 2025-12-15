@@ -9,6 +9,11 @@ import (
 	"github.com/roothash-pay/wallet-services/common/opio"
 )
 
+// @title           Wallet Service API
+// @version         1.0
+// @description     Swagger UI for API testing
+// @host            localhost:8080
+// @BasePath        /api/v1
 func main() {
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stdout, log.LevelInfo, true)))
 	app := NewCli()

@@ -47,7 +47,7 @@ type WalletTxRecord struct {
 	ToAddress      string     `gorm:"column:to_address;type:varchar(70);not null;index" json:"to_address"`
 	Amount         string     `gorm:"column:amount;type:numeric(78,0);not null" json:"amount"` // 使用 string 存储大数字（支持 uint256）
 	Memo           string     `gorm:"column:memo;type:varchar(500);not null" json:"memo"`
-	Hash           string     `gorm:"column:hash;type:varchar(500);default:'';uniqueIndex" json:"hash"`
+	TxID           string     `gorm:"column:tx_id;type:varchar(500);default:'';uniqueIndex" json:"tx_id"`
 	BlockHeight    string     `gorm:"column:block_height;type:varchar(500);default:''" json:"block_height"`
 	TxType         string     `gorm:"column:tx_type;type:varchar(50);default:'transfer';index" json:"tx_type"` // approve, swap, bridge, wrap, unwrap, transfer
 	Status         int        `gorm:"column:status;type:integer;default:0;index:idx_status_last_checked" json:"status"`
@@ -64,7 +64,7 @@ func (WalletTxRecord) TableName() string {
 
 type WalletTxRecordView interface {
 	GetByGuid(guid string) (*WalletTxRecord, error)
-	GetByHash(hash string) (*WalletTxRecord, error)
+	GetByTxID(txID string) (*WalletTxRecord, error)
 	GetByOperationID(operationID string) ([]*WalletTxRecord, error)
 	GetTxList(page, pageSize int, filters map[string]interface{}) ([]*WalletTxRecord, int64, error)
 	GetPendingTxsForCheck(lastCheckedBefore time.Time, limit int) ([]*WalletTxRecord, error)
@@ -111,10 +111,10 @@ func (db *walletTxRecordDB) GetByGuid(guid string) (*WalletTxRecord, error) {
 	return &r, nil
 }
 
-func (db *walletTxRecordDB) GetByHash(hash string) (*WalletTxRecord, error) {
+func (db *walletTxRecordDB) GetByTxID(txID string) (*WalletTxRecord, error) {
 	var r WalletTxRecord
-	if err := db.gorm.Where("hash = ?", hash).First(&r).Error; err != nil {
-		log.Error("GetByHash WalletTxRecord error", "err", err)
+	if err := db.gorm.Where("tx_id = ?", txID).First(&r).Error; err != nil {
+		log.Error("GetByTxID WalletTxRecord error", "err", err)
 		return nil, err
 	}
 	return &r, nil
@@ -146,8 +146,13 @@ func (db *walletTxRecordDB) GetTxList(page, pageSize int, filters map[string]int
 			continue
 		}
 		switch key {
-		case "from_address", "to_address", "hash", "wallet_uuid", "chain_id", "token_id", "tx_type":
+		case "from_address", "to_address", "wallet_uuid", "chain_id", "token_id", "tx_type":
 			query = query.Where(key+" = ?", value)
+		case "hash":
+			// 兼容旧参数名
+			query = query.Where("tx_id = ?", value)
+		case "tx_id":
+			query = query.Where("tx_id = ?", value)
 		case "tx_status":
 			query = query.Where("status = ?", value)
 		default:
@@ -193,7 +198,7 @@ func (db *walletTxRecordDB) GetPendingTxsForCheck(lastCheckedBefore time.Time, l
 	var list []*WalletTxRecord
 	query := db.gorm.Model(&WalletTxRecord{}).
 		Where("status = ?", TxStatusPending).
-		Where("hash != ?", ""). // 必须有 hash
+		Where("tx_id != ?", ""). // 必须有 tx_id
 		Where("(last_checked_at IS NULL OR last_checked_at < ?)", lastCheckedBefore).
 		Order("last_checked_at ASC NULLS FIRST"). // 优先处理从未检查过的
 		Limit(limit)

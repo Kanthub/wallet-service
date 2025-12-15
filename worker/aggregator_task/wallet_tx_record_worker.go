@@ -188,15 +188,15 @@ func (w *WalletTxRecordWorker) checkAndUpdateTx(ctx context.Context, record *dbB
 		info.WalletChain,
 		info.WalletCoin,
 		info.WalletNetwork,
-		record.Hash,
+		record.TxID,
 	)
 	if err != nil {
-		log.Warn("Failed to get tx by hash", "guid", record.Guid, "hash", record.Hash, "err", err)
+		log.Warn("Failed to get tx by hash", "guid", record.Guid, "hash", record.TxID, "err", err)
 		return
 	}
 
 	if txInfo == nil {
-		log.Warn("Tx not found", "guid", record.Guid, "hash", record.Hash)
+		log.Warn("Tx not found", "guid", record.Guid, "hash", record.TxID)
 		return
 	}
 
@@ -228,9 +228,9 @@ func (w *WalletTxRecordWorker) markAsSuccess(record *dbBackend.WalletTxRecord, b
 	}
 
 	if err := w.db.UpdateWalletTxRecord(record.Guid, updates); err != nil {
-		log.Error("Failed to mark tx as success", "guid", record.Guid, "hash", record.Hash, "err", err)
+		log.Error("Failed to mark tx as success", "guid", record.Guid, "hash", record.TxID, "err", err)
 	} else {
-		log.Info("Tx marked as success", "guid", record.Guid, "hash", record.Hash, "blockHeight", blockHeight)
+		log.Info("Tx marked as success", "guid", record.Guid, "hash", record.TxID, "blockHeight", blockHeight)
 	}
 }
 
@@ -244,9 +244,9 @@ func (w *WalletTxRecordWorker) markAsFailed(record *dbBackend.WalletTxRecord, fa
 	}
 
 	if err := w.db.UpdateWalletTxRecord(record.Guid, updates); err != nil {
-		log.Error("Failed to mark tx as failed", "guid", record.Guid, "hash", record.Hash, "err", err)
+		log.Error("Failed to mark tx as failed", "guid", record.Guid, "hash", record.TxID, "err", err)
 	} else {
-		log.Info("Tx marked as failed", "guid", record.Guid, "hash", record.Hash, "reason", failReasonCode)
+		log.Info("Tx marked as failed", "guid", record.Guid, "hash", record.TxID, "reason", failReasonCode)
 	}
 }
 
