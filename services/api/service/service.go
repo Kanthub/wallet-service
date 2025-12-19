@@ -10,6 +10,7 @@ import (
 	"github.com/roothash-pay/wallet-services/database/backend"
 	"github.com/roothash-pay/wallet-services/services/api/validator"
 	"github.com/roothash-pay/wallet-services/services/common"
+	"github.com/roothash-pay/wallet-services/services/market/cache"
 )
 
 type HandlerSvc struct {
@@ -66,6 +67,7 @@ func New(v *validator.Validator,
 	s3Service *common.S3Service,
 	jwtSecret string,
 	domain string,
+	cache cache.Cache,
 ) *HandlerSvc {
 
 	chains := make([]ChainType, 0, len(cfg.Chains))
@@ -125,7 +127,7 @@ func New(v *validator.Validator,
 		WalletTxRecordService:    NewWalletTxRecordService(db),
 		WalletAddressNoteService: NewWalletAddressNoteService(db),
 		FiatCurrencyRateService:  NewFiatCurrencyRateService(db),
-		MarketPriceService:       NewMarketPriceService(db),
+		MarketPriceService:       NewMarketPriceService(db, cache),
 		KlineService:             NewKlineService(db),
 		NewsletterCatService:     NewNewsletterCatService(db),
 		NewsletterService:        NewNewsletterService(db),

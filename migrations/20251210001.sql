@@ -330,8 +330,8 @@ CREATE TABLE IF NOT EXISTS topic_cat (
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_guid ON newsletter_cat(guid);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_cat_name ON newsletter_cat(cat_name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_cat_guid ON topic_cat(guid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_cat_name ON topic_cat(cat_name);
 
 CREATE TABLE IF NOT EXISTS topic (
     guid          VARCHAR PRIMARY KEY,
@@ -360,7 +360,7 @@ CREATE TABLE IF NOT EXISTS topic_reply (
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_reply_guid ON topic_reply(guid);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_reply_cat_uuid ON topic_reply(cat_uuid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_reply_cat_uuid ON topic_reply(topic_uuid);
 
 
 -- table queue_tx

@@ -11,7 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	redis1 "github.com/redis/go-redis/v9"
+	httpSwagger "github.com/swaggo/http-swagger"
+
 	"github.com/roothash-pay/wallet-services/services/api/validator"
+	"github.com/roothash-pay/wallet-services/services/market/cache"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/go-chi/chi/v5"
@@ -26,7 +30,6 @@ import (
 	common2 "github.com/roothash-pay/wallet-services/services/common"
 
 	_ "github.com/roothash-pay/wallet-services/docs"
-	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 const (
@@ -42,10 +45,11 @@ type APIConfig struct {
 }
 
 type API struct {
-	router    *chi.Mux
-	apiServer *httputil.HTTPServer
-	db        *database.DB
-	stopped   atomic.Bool
+	router      *chi.Mux
+	apiServer   *httputil.HTTPServer
+	db          *database.DB
+	marketCache cache.Cache
+	stopped     atomic.Bool
 }
 
 func NewApi(ctx context.Context, cfg *config.Config) (*API, error) {
@@ -60,6 +64,11 @@ func (a *API) initFromConfig(ctx context.Context, cfg *config.Config) error {
 	if err := a.initDB(ctx, cfg); err != nil {
 		return fmt.Errorf("failed to init DB: %w", err)
 	}
+
+	if err := a.initMarketCache(cfg); err != nil {
+		return fmt.Errorf("failed to init market cache: %w", err)
+	}
+
 	a.initRouter(ctx, cfg)
 	if err := a.startServer(cfg.HttpServer); err != nil {
 		return fmt.Errorf("failed to start API server: %w", err)
@@ -83,6 +92,23 @@ func (a *API) initDB(ctx context.Context, cfg *config.Config) error {
 		}
 	}
 	a.db = initDb
+	return nil
+}
+
+func (a *API) initMarketCache(cfg *config.Config) error {
+	if cfg.MarketPriceWorkerConfig.UseRedis {
+		redisClient := redis1.NewClient(&redis1.Options{
+			Addr:     cfg.RedisConfig.Addr,
+			Password: cfg.RedisConfig.Password,
+			DB:       cfg.RedisConfig.DB,
+		})
+		a.marketCache = cache.NewRedisCache(redisClient)
+		log.Info("API market cache initialized with redis")
+
+	} else {
+		a.marketCache = cache.NewMemoryCache()
+		log.Warn("API market cache initialized with memory (NOT for production)")
+	}
 	return nil
 }
 
@@ -131,7 +157,7 @@ func (a *API) initRouter(ctx context.Context, cfg *config.Config) {
 		}
 	}
 
-	svc := service.New(v, a.db, cfg, a.db.BackendAdmin, emailService, smsService, authenticatorService, kodoService, s3Service, cfg.JWTSecret, cfg.Domain)
+	svc := service.New(v, a.db, cfg, a.db.BackendAdmin, emailService, smsService, authenticatorService, kodoService, s3Service, cfg.JWTSecret, cfg.Domain, a.marketCache)
 	apiRouter := chi.NewRouter()
 	h := routes.NewRoutes(apiRouter, svc)
 

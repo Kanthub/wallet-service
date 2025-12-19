@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ethereum/go-ethereum/log"
+	redis1 "github.com/redis/go-redis/v9"
 
 	"github.com/roothash-pay/wallet-services/common/httputil"
 	"github.com/roothash-pay/wallet-services/common/redis"
@@ -22,6 +23,7 @@ import (
 	"github.com/roothash-pay/wallet-services/metrics"
 	"github.com/roothash-pay/wallet-services/services/common/chaininfo"
 	"github.com/roothash-pay/wallet-services/services/grpc_client/account"
+	"github.com/roothash-pay/wallet-services/services/market/cache"
 	"github.com/roothash-pay/wallet-services/services/websocket"
 	"github.com/roothash-pay/wallet-services/worker/aggregator_task"
 	"github.com/roothash-pay/wallet-services/worker/market_task"
@@ -40,6 +42,7 @@ type WalletServices struct {
 	shutdown           context.CancelCauseFunc
 	stopped            atomic.Bool
 	chainIdList        []uint64
+	marketCache        cache.Cache
 }
 
 type RpcServerConfig struct {
@@ -59,9 +62,15 @@ func NewWalletServices(ctx context.Context, cfg *config.Config, shutdown context
 		phoenixMetrics:  PhoenixMetrics,
 		shutdown:        shutdown,
 	}
+
+	if err := out.initMarketCache(cfg); err != nil {
+		return nil, err
+	}
+
 	if err := out.initFromConfig(ctx, cfg); err != nil {
 		return nil, errors.Join(err, out.Stop(ctx))
 	}
+
 	log.Info("New wallet services success🏅️")
 	return out, nil
 }
@@ -181,11 +190,12 @@ func (as *WalletServices) initDB(ctx context.Context, cfg config.DBConfig) error
 	return nil
 }
 
-func (as *WalletServices) initWorker(config *config.Config) error {
-	mwConfig := &market_task.MarketPriceWorkerConfig{
-		LoopInterval: time.Second * 5,
+func (as *WalletServices) initWorker(cfg *config.Config) error {
+	mwConfig := &cfg.MarketPriceWorkerConfig
+	if mwConfig.LoopInterval <= 0 {
+		mwConfig.LoopInterval = time.Second * 5
 	}
-	marketPriceWorker, err := market_task.NewMarketPriceWorker(as.DB, mwConfig, as.wsHub, as.shutdown)
+	marketPriceWorker, err := market_task.NewMarketPriceWorker(as.DB, as.marketCache, mwConfig, as.wsHub, as.shutdown)
 	if err != nil {
 		log.Error("new market price worker fail", "err", err)
 		return err
@@ -203,14 +213,14 @@ func (as *WalletServices) initWorker(config *config.Config) error {
 	as.fiatCurrencyWorker = fiatCurrencyWorker
 
 	// Initialize wallet tx record worker if aggregator is enabled
-	if config.AggregatorConfig.WalletAccountAddr != "" {
-		accountClient, err := account.NewWalletAccountClient(config.AggregatorConfig.WalletAccountAddr)
+	if cfg.AggregatorConfig.WalletAccountAddr != "" {
+		accountClient, err := account.NewWalletAccountClient(cfg.AggregatorConfig.WalletAccountAddr)
 		if err != nil {
 			log.Warn("failed to create wallet account client for tx worker", "err", err)
 		} else {
 			var chainInfoRedis *redis.Client
-			if config.RedisConfig.Addr != "" {
-				chainInfoRedis, err = redis.NewClient(&config.RedisConfig)
+			if cfg.RedisConfig.Addr != "" {
+				chainInfoRedis, err = redis.NewClient(&cfg.RedisConfig)
 				if err != nil {
 					log.Warn("failed to init redis for chain info cache", "err", err)
 				}
@@ -218,8 +228,8 @@ func (as *WalletServices) initWorker(config *config.Config) error {
 			chainInfoManager := chaininfo.NewManager(
 				as.DB.BackendChain,
 				chainInfoRedis,
-				config.AggregatorConfig.WalletAccountConsumerToken,
-				config.AggregatorConfig.ChainConsumerTokens,
+				cfg.AggregatorConfig.WalletAccountConsumerToken,
+				cfg.AggregatorConfig.ChainConsumerTokens,
 			)
 			if warmErr := chainInfoManager.WarmUp(context.Background()); warmErr != nil {
 				log.Warn("failed to warm up chain info cache for worker", "err", warmErr)
@@ -258,5 +268,33 @@ func (as *WalletServices) startMetricsServer(cfg config.ServerConfig) error {
 	}
 	as.metricsServer = srv
 	log.Info("metrics server started", "port", cfg.Port, "addr", srv.Addr())
+	return nil
+}
+
+func (as *WalletServices) initMarketCache(cfg *config.Config) error {
+	if cfg.MarketPriceWorkerConfig.UseRedis {
+		// redisClient, err := redis.NewClient(&cfg.RedisConfig)
+		// if err != nil {
+		// 	return err
+		// }
+		redisClient := redis1.NewClient(&redis1.Options{
+			Addr:     cfg.RedisConfig.Addr,
+			Password: cfg.RedisConfig.Password,
+			DB:       cfg.RedisConfig.DB,
+		})
+		as.marketCache = cache.NewRedisCache(redisClient)
+		log.Info("market cache initialized with redis")
+		log.Info("redis cache ready",
+			"addr", cfg.RedisConfig.Addr,
+			"db", cfg.RedisConfig.DB,
+		)
+		log.Info("redis cache ready",
+			"addr", cfg.RedisConfig.Addr,
+			"db", cfg.RedisConfig.DB,
+		)
+	} else {
+		as.marketCache = cache.NewMemoryCache()
+		log.Info("market cache initialized with memory")
+	}
 	return nil
 }

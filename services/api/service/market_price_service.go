@@ -2,17 +2,23 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/roothash-pay/wallet-services/database"
 	"github.com/roothash-pay/wallet-services/database/backend"
+	"github.com/roothash-pay/wallet-services/services/market/cache"
+	"github.com/roothash-pay/wallet-services/services/market/model"
 )
 
 type MarketPriceService interface {
 	SetMarketPrice(ctx context.Context, req SetMarketPriceRequest) error
 	GetByTokenID(ctx context.Context, tokenID string) (*backend.MarketPrice, error)
 	GetByGuid(ctx context.Context, guid string) (*backend.MarketPrice, error)
+
+	GetPrice(ctx context.Context, symbol string) (*model.Quote, error)
 }
 
 type SetMarketPriceRequest struct {
@@ -28,11 +34,35 @@ type SetMarketPriceRequest struct {
 }
 
 type marketPriceService struct {
-	db *database.DB
+	db    *database.DB
+	cache cache.Cache
 }
 
-func NewMarketPriceService(db *database.DB) MarketPriceService {
-	return &marketPriceService{db: db}
+func NewMarketPriceService(db *database.DB, cache cache.Cache) MarketPriceService {
+	return &marketPriceService{db: db, cache: cache}
+}
+
+// 读缓存里的最新价格（只读，不裁决）
+func (s *marketPriceService) GetPrice(
+	ctx context.Context,
+	symbol string,
+) (*model.Quote, error) {
+	key := "price:" + strings.ToUpper(symbol)
+
+	data, ok, err := s.cache.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, nil // 或者自定义 ErrCacheMiss
+	}
+
+	var quote model.Quote
+	if err := json.Unmarshal(data, &quote); err != nil {
+		return nil, err
+	}
+
+	return &quote, nil
 }
 
 func (s *marketPriceService) SetMarketPrice(

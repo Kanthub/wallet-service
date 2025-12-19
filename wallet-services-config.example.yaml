@@ -9,7 +9,8 @@ master_db:
   port: 5432
   name: "wallet_services"
   user: "postgres"
-  password: "your_password"
+  password: "postgres"
+  ssl_mode: disable
 
 # Redis
 redis_config:
@@ -19,6 +20,16 @@ redis_config:
 
 # JWT
 jwt_secret: "your-dev-secret-key"
+
+# Market Price Worker
+market_price_worker_config:
+  loop_interval: 300
+  use_redis: true
+
+# Websocket 服务器
+websocket_server:
+  host: "0.0.0.0"
+  port: 8090
 
 # 闪兑聚合器
 aggregator_config:

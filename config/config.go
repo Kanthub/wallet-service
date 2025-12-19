@@ -36,8 +36,15 @@ type Config struct {
 	RedisConfig               RedisConfig      `yaml:"redis_config"`
 	AggregatorConfig          AggregatorConfig `yaml:"aggregator_config"`
 
+	MarketPriceWorkerConfig MarketPriceWorkerConfig `yaml:"market_price_worker_config"`
+
 	RpcConfig RpcConfig `yaml:"rpc_config"`
 	Chains    []string  `yaml:"chains"`
+}
+
+type MarketPriceWorkerConfig struct {
+	LoopInterval time.Duration `yaml:"loop_interval"`
+	UseRedis     bool          `yaml:"use_redis"`
 }
 
 type RpcConfig struct {

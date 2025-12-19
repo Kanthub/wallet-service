@@ -90,18 +90,36 @@ func (h *Hub) Run() {
 	}
 }
 
-func (h *Hub) BroadcastBridgeFinalized(msg *BridgeFinalizedMessage) {
-	msg.Type = "bridge_finalized"
-	msg.Time = time.Now().Unix()
+func (h *Hub) Broadcast(event string, data any) {
+	msg := Message{
+		Type: event,
+		Data: data,
+		Time: time.Now().Unix(),
+	}
 
-	data, err := json.Marshal(msg)
+	b, err := json.Marshal(msg)
 	if err != nil {
-		log.Error("Failed to marshal bridge finalized message", "err", err)
+		log.Error("failed to marshal ws message", "event", event, "err", err)
 		return
 	}
 
-	h.broadcast <- data
-	log.Info("Broadcasted bridge finalized event", "tx_hash", msg.TxHash)
+	h.broadcast <- b
+}
+
+func (h *Hub) BroadcastBridgeFinalized(msg *BridgeFinalizedMessage) {
+	// msg.Type = "bridge_finalized"
+	// msg.Time = time.Now().Unix()
+
+	// data, err := json.Marshal(msg)
+	// if err != nil {
+	// 	log.Error("Failed to marshal bridge finalized message", "err", err)
+	// 	return
+	// }
+
+	// h.broadcast <- data
+	// log.Info("Broadcasted bridge finalized event", "tx_hash", msg.TxHash)
+
+	h.Broadcast("bridge_finalized", msg)
 }
 
 func (h *Hub) GetClientCount() int {
